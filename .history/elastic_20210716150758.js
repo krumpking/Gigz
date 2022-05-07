@@ -1,0 +1,88 @@
+const { Client } = require('elasticsearch');
+const elasticSearchClient = new Client({ 
+  node: 'http://localhost:9200',
+  // log: 'trace'
+ });
+
+
+ module.exports = {
+    getClient: async function (id)  {
+        const res = await elasticSearchClient.get({
+            index: 'clients',
+            id: id
+        });
+        
+        return res;
+
+    },
+    createClient: async function (id,name) {
+        const res = await elasticSearchClient.create({
+            index: 'clients',
+            id: id,
+            body: {
+                name: name,
+                no: id,
+                date: new Date(),
+                subscribed: false,
+            }
+        });
+        
+        return res;
+
+    },
+    updateClientOnSearch: async function (id,whereFrom, budget,beds) {
+        const res = await elasticSearchClient.update({
+            index: 'clients',
+            id: id,
+            body: {
+                doc: {
+                    whereFrom: whereFrom,
+                    budget:budget,
+                    beds: beds,
+                    subscribed: false,
+                }
+            }
+        })
+    },
+    updateClientOnSubscribe: async function (id,suburbs, description,familySize) {
+        const res = await elasticSearchClient.update({
+            index: 'clients',
+            id: id,
+            body: {
+                doc: {
+                    suburbs: suburbs,
+                    description:description,
+                    familySize: familySize,
+                }
+            }
+        });
+        
+        return res;
+    },
+    deleteClient: async function (id)  {
+         
+    },
+    addHouses: async function (id) {
+         
+    },
+    addLeads: async function (id) {
+         
+    },
+    getHouses: async function (id) {
+         
+    },
+    getClientHousesMatches: async function (){
+    
+    },
+    addSearchers: async function (){
+    
+    },
+    addVisitors: async function (){
+    
+    },
+    addPayments: async function (){
+    
+    },
+ 
+
+ }
