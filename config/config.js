@@ -7,14 +7,8 @@ module.exports = function initConnection() {
   var mongoDB = MONGO_DB_URL;
 
 
-  const options = {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    useFindAndModify: false,
-    useCreateIndex: true,
-  };
 
-  mongoose.connect(mongoDB, options);
+  mongoose.connect(mongoDB);
   mongoose.Promise = global.Promise;
   var db = mongoose.connection;
   db.on('error', console.error.bind(console, 'MongoDB connection error:'));

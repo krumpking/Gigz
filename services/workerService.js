@@ -59,8 +59,14 @@ module.exports = {
         newWorker.save();
 
     },
-    getClientsBySkillsCat: function (gig) { // show be able to to ensure Gig are approved and are not after the finalDay 
-        return Worker.find({ category: gig.category }).fuzzySearch(gig.skills).sort({ date: 1 });
+    getClientsBySkillsCat: async function (gig) { // show be able to to ensure Gig are approved and are not after the finalDay 
+        var allWorkers = [];
+        var skills = gig.skills.split(" ");
+        for (skill of skills) {
+            const currWorkers = await Worker.find({ category: gig.category }).find({ skills: { $regex: skill, $options: "i" } }).sort({ date: 1 });
+            allWorkers = allWorkers.concat(currWorkers);
+        }
+        return allWorkers;
     },
 
 

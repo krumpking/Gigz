@@ -1,5 +1,5 @@
 var mongoose = require('mongoose');
-const mongooseFuzzySearching = require('mongoose-fuzzy-searching');
+// const mongoose_fuzzy_searching = require('mongoose-fuzzy-searching-v3');
 var Schema = mongoose.Schema;
 
 var ReviewSchema = new Schema({
@@ -12,6 +12,6 @@ var ReviewSchema = new Schema({
 
 
 
-ReviewSchema.plugin(mongooseFuzzySearching, { fields: ['review'] });
+// ReviewSchema.plugin(mongoose_fuzzy_searching, { fields: ['review'] });
 // Export model.
 module.exports = mongoose.model('Review', ReviewSchema, 'reviews');	

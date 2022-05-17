@@ -1,5 +1,5 @@
 var mongoose = require('mongoose');
-const mongooseFuzzySearching = require('mongoose-fuzzy-searching');
+// const mongoose_fuzzy_searching = require('mongoose-fuzzy-searching-v3');
 var Schema = mongoose.Schema;
 
 var WorkerSchema = new Schema({
@@ -17,6 +17,6 @@ var WorkerSchema = new Schema({
 
 
 
-WorkerSchema.plugin(mongooseFuzzySearching, { fields: ['skills', 'category'] });
+// WorkerSchema.plugin(mongoose_fuzzy_searching, { fields: ['skills', 'category'] });
 // Export model.
 module.exports = mongoose.model('Worker', WorkerSchema, 'workers');	

@@ -100,6 +100,7 @@ var messageCounterMap = new Map();
 var invoice = new Date().getTime().toString();
 var pollUrl = "";
 const zwlPrice = 400;
+const ourContact = "263719066282@c.us";
 
 client.on('message', async msg => {
 
@@ -131,7 +132,7 @@ client.on('message', async msg => {
 
 
 
-            if (query == "#") {
+            if (query === "#") {
                 messageToSend += "You have reset now.\nType hi message to continue or click link below \nhttps://wa.me/263713020524?text=hie";
                 messageChain.delete(no);
                 messages = [];
@@ -188,7 +189,7 @@ client.on('message', async msg => {
                                     messageChain.set(no, messages);
                                     myGigsMap.set(no, v);
                                     let el = v;
-                                    messageToSend += `This is the gig you want to bid for \n\nBudget:${el.budget}USD ${el.paymentStructure} \n${el.details}  \n${getDaysDifference(el.finalDay)} day(s) left to bid \n\n`;
+                                    messageToSend += `This is the gig you want to bid for \n\nBudget:${el.budget}USD ${el.paymentStructure} \n${el.details}  \n${getDaysDifference(el.finalDay)} left to bid \n\n`;
                                     messageToSend += `Type your bid(a message with your application/proposal for the gig(job)) for the gig, this means basically, typing to the person offering the gig, why they should work with you and not anyone else,type bid(proposal/application) right after this message,whatever you type after this message is going to be sent to the person who posted this gig \n\nIf this is not what you want type # to restart`;
                                 } else {
                                     messageToSend += `The gig you typed has not been found, please check the link again or type # to restart`;
@@ -353,6 +354,15 @@ client.on('message', async msg => {
 
                 }).catch(console.error);
 
+            } else if (query.toLowerCase() === "add") {
+                messageChain.delete(no);
+                messages = [];
+                messages.push(query);
+                messageChain.set(no, messages);
+                messageToSend += `Can you type the full details of the property`;
+                client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                }).catch(console.error);
             } else {
 
                 switch (messages.length) {
@@ -377,7 +387,7 @@ client.on('message', async msg => {
                                                 if (r.length > 0) {
                                                     messageToSend += "These are the gigz available right now\n\n";
                                                     r.forEach((el) => {
-                                                        messageToSend += `${el.details} \nBudget:${el.budget}USD ${el.paymentStructure}  \n${getDaysDifference(el.finalDay)} day(s) left to bid\nTo Bid for this gig click this link https://wa.me/263713020524?text=bid@${el.id} \n\n`;
+                                                        messageToSend += `${el.details} \nBudget:${el.budget}USD ${el.paymentStructure}  \n${getDaysDifference(el.finalDay)} left to bid\nTo Bid for this gig click this link https://wa.me/263713020524?text=bid@${el.id} \n\n`;
                                                         seenGigz.push(el);
                                                     });
                                                     seenGigzMap.set(no, seenGigz);
@@ -496,7 +506,7 @@ client.on('message', async msg => {
                             } else if (query === "1") {
                                 messages.push(query);
                                 messageChain.set(no, messages);
-                                messageToSend += "Can you type the details of what you need to be done and where the work will done, PLEASE be detailed  ,eg I need someone to fix my fridge, it is emperial one door has been working and suddenly went quiet I suspect a power short cucuit OR I need a truck to help move my good from Mabelreign to Malborough about 12km distance I have delicate furniture OR I need someone to look for accomodation for me in Kuwadzana my budget is 350, tiled,walled and gated preffered etc, OR I need some to make a website for my company, just 5 pages describing what we do, I will send you the company information in Harare";
+                                messageToSend += "Can you type the details of what you need to be done and where the work will done, PLEASE be detailed  ,\neg I need someone to fix my fridge, it is emperial one door has been working and suddenly went quiet I suspect a power short cucuit \nOR I need a truck to help move my good from Mabelreign to Malborough about 12km distance I have delicate furniture \nOR I need someone to look for accomodation for me in Kuwadzana my budget is 350, tiled,walled and gated preffered etc, \nthOR I need some to make a website for my company, just 5 pages describing what we do, I will send you the company information in Harare";
                                 client.sendMessage(msg.from, messageToSend).then((res) => {
 
                                 }).catch(console.error);
@@ -681,6 +691,92 @@ client.on('message', async msg => {
                                 }
 
 
+                            } else if (messages[0].toLowerCase() === "add") {
+
+
+                                if (validateEmail(query) && isValid(query)) {
+                                    messageToSend += `Is appears you put in some information that is not allowed at this stage, DO NOT INCLUDE EMAILS OR PHONE NUMBER, there are already added as part of this`;
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                                    }).catch(console.error);
+                                } else {
+                                    messageChain.delete(no);
+                                    messages = [];
+                                    let now = new Date();
+                                    let start = new Date(now.getFullYear(), 0, 0);
+                                    let diff = now - start;
+                                    let oneDay = 1000 * 60 * 60 * 24;
+                                    let day = Math.floor(diff / oneDay);
+                                    let milliSecondsSinceEpochPropID = new Date().valueOf().toString();
+
+
+
+                                    mongoWorker.getWorker(no).then((v) => {
+
+                                        if (v != null) {
+                                            query += `\nIf you are interested in this click this link https://wa.me/263713020524?text=${v.id}@interested${milliSecondsSinceEpochPropID}`;
+                                            firebase.addRentalProperty(day, "Harare", query, no, milliSecondsSinceEpochPropID).then((r) => {
+                                                messageToSend = `Your property has been added, and will be posted after it is approved!`;
+                                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                                    let mess = `${no} added ${query}`;
+                                                    client.sendMessage(ourContact, mess).then((res) => {
+
+                                                    }).catch(console.error);
+                                                }).catch(console.error);
+                                            }).catch(console.error);
+
+
+                                        } else {
+
+                                            let milliSecondsSinceEpoch = new Date().valueOf().toString();
+
+                                            let worker = new Worker({
+                                                name: "New User",
+                                                category: "Facilities and property services",
+                                                skills: "Real estate accommodation",
+                                                brief: "Not updated yet",
+                                                areas: "Harare",
+                                                no: no,
+                                                bids: 100,
+                                                date: new Date(),
+                                                id: milliSecondsSinceEpoch
+                                            });
+
+                                            mongoWorker.saveWorker(worker).then((v) => {
+                                                query += `\nIf you are interested in this click this link https://wa.me/263713020524?text=${v.id}@interested${milliSecondsSinceEpochPropID}`;
+                                                firebase.addRentalProperty(day, "Harare", query, no, milliSecondsSinceEpochPropID).then((r) => {
+                                                    messageToSend = `Your property has been added, and will be posted after it is approved!`;
+                                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+                                                        let mess = `${no} added ${query}`;
+                                                        client.sendMessage(ourContact, mess).then((res) => {
+
+                                                        }).catch(console.error);
+
+                                                    }).catch(console.error);
+                                                }).catch(console.error);
+
+
+                                            }).catch((e) => {
+                                                console.error(e);
+                                                messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
+                                                messages = [];
+                                                messageChain.delete(no);
+                                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                                    // console.log("Res " + JSON.stringify(res));
+                                                }).catch(console.error);
+
+                                            });
+
+
+                                        }
+
+                                    }).catch(console.error);
+
+
+                                }
+
+
+
 
                             } else {
 
@@ -800,7 +896,7 @@ client.on('message', async msg => {
                                 }).catch(console.error);
 
                                 var mess = `${name} whose number is ${no} just added a report ${query}`;
-                                client.sendMessage("263771376220@c.us", mess).then((res) => {
+                                client.sendMessage(ourContact, mess).then((res) => {
 
                                 }).catch(console.error);
 
@@ -817,7 +913,7 @@ client.on('message', async msg => {
                                             if (v.length > 0) {
                                                 messageToSend += "These are the next batch of gigz available right now\n\n";
                                                 v.forEach((el) => {
-                                                    messageToSend += `${el.details} \nBudget:${el.budget}USD ${el.paymentStructure}  \n${getDaysDifference(el.finalDay)} day(s) left to bid \nTo Bid for this gig click this link https://wa.me/263713020524?text=bid@${el.id} \n\n`;
+                                                    messageToSend += `${el.details} \nBudget:${el.budget}USD ${el.paymentStructure}  \n${getDaysDifference(el.finalDay)} left to bid \nTo Bid for this gig click this link https://wa.me/263713020524?text=bid@${el.id} \n\n`;
                                                     seenGigz.push(el);
                                                 });
                                                 seenGigzMap.set(no, seenGigz);
@@ -860,7 +956,7 @@ client.on('message', async msg => {
                                     if (v.length > 0) {
                                         messageToSend += "These are the gigz available right now\n\n";
                                         v.forEach((el) => {
-                                            messageToSend += `${el.details} \nBudget:${el.budget}USD ${el.paymentStructure} \n${getDaysDifference(el.finalDay)} day(s) left to bid \nTo Bid for this gig click this link https://wa.me/263713020524?text=bid@${el.id} \n\n`;
+                                            messageToSend += `${el.details} \nBudget:${el.budget}USD ${el.paymentStructure} \n${getDaysDifference(el.finalDay)} left to bid \nTo Bid for this gig click this link https://wa.me/263713020524?text=bid@${el.id} \n\n`;
                                             seenGigz.push(el);
                                         });
                                         seenGigzMap.set(no, seenGigz);
@@ -925,7 +1021,7 @@ client.on('message', async msg => {
 
                                 }
                             } else if (messages[1] === "5") {
-                                messageChain.delele(no);
+                                messageChain.delete(no);
                                 if (query === "1") {
                                     var messageToSend = "A gig is a job usually for a specified time, a once-off job, a once-off contract ";
                                     client.sendMessage(msg.from, messageToSend).then((res) => {
@@ -1079,7 +1175,7 @@ client.on('message', async msg => {
                                     if (v.length > 0) {
                                         messageToSend += "These are the gigz available right now\n\n";
                                         v.forEach((el) => {
-                                            messageToSend += `${el.details} \nBudget:${el.budget}USD ${el.paymentStructure} \n${getDaysDifference(el.finalDay)} day(s) left to bid \nTo Bid for this gig click this link https://wa.me/263713020524?text=bid@${el.id} \n\n`;
+                                            messageToSend += `${el.details} \nBudget:${el.budget}USD ${el.paymentStructure} \n${getDaysDifference(el.finalDay)} left to bid \nTo Bid for this gig click this link https://wa.me/263713020524?text=bid@${el.id} \n\n`;
                                             seenGigz.push(el);
                                         });
                                         seenGigzMap.set(no, seenGigz);
@@ -1138,7 +1234,7 @@ client.on('message', async msg => {
                         } else if (messages[1] === "1") {
                             messages.push(query);
                             messageChain.set(no, messages);
-                            messageToSend += "When is the final day for receiving bids(messages from people interested in thiS gig(job) the best time is normally *atleast* 7 days and for those looking for houses/rooms for rent we believe 14 days from today is recommended for best results), use this format MM-DD-YYYY e.g 12-25-2022 \n\nIf this is not what you want type # to restart";
+                            messageToSend += "When is the final day for receiving bids(messages from people interested in this gig(job) the best time is normally *atleast* 7 days and for those looking for houses/rooms for rent we believe 14 days from today is recommended for best results), use this format MM-DD-YYYY e.g 12-25-2022 \n\nIf this is not what you want type # to restart";
                             client.sendMessage(msg.from, messageToSend).then((res) => {
                                 // console.log("Res " + JSON.stringify(res));
                             }).catch(console.error);
@@ -1162,7 +1258,7 @@ client.on('message', async msg => {
                         } else if (messages[1] === "1") {
 
 
-                            if (isValidDate(query) && getDaysDifference(query) < 366) {
+                            if (isValidDate(query) && getDaysforGigDifference(query) < 366) {
                                 messages.push(query);
                                 messageChain.set(no, messages);
 
@@ -1419,7 +1515,7 @@ client.on('message', async msg => {
                                     messageChain.set(no, messages);
                                     myGigsMap.set(no, v);
                                     let el = v;
-                                    messageToSend += `This is the gig you want to bid for \n\nBudget:${el.budget}USD ${el.paymentStructure} \n${el.details}  \n${getDaysDifference(el.finalDay)} day(s) left to bid \n\n`;
+                                    messageToSend += `This is the gig you want to bid for \n\nBudget:${el.budget}USD ${el.paymentStructure} \n${el.details}  \n${getDaysDifference(el.finalDay)} left to bid \n\n`;
                                     messageToSend += `Type your bid(application/proposal for the job) for the gig, this means basically, type your OFFER for the gig, it can include why they should work with you and not anyone else, your best price, ,type it *right after this message* \n\nIf this is not what you want type # to restart`;
                                 } else {
                                     messageToSend += `The gig you typed has not been found, please check the link again or type # to restart`;
@@ -1455,7 +1551,7 @@ client.on('message', async msg => {
 
                 }).catch(console.error);
 
-            } else if (query.substring(query.indexOf('@') + 1, query.length - 17) == "accept" && query.substring(0, query.indexOf('@')).length == 13) { // accept bid 
+            } else if (query.substring(query.indexOf('@') + 1, query.length - 17) === "accept" && query.substring(0, query.indexOf('@')).length === 13) { // accept bid 
                 messages.push(query);
                 messageChain.set(no, messages);
                 mongoGig.findGig(messages[0].substring(messages[0].indexOf('t') + 1, messages[0].indexOf('@gig'))).then((gig) => {
@@ -1491,7 +1587,7 @@ client.on('message', async msg => {
 
                         });
                     } else {
-                        messageToSend += `We are glad we managed to connect you with talent for your gig, we charge a small 9% finders fee, to notify the talent you have chosen them, kindly type pay to pay finder\'s fee, \nTo pay, type the ecocash number you are using to pay, e.g 0713020524, \n(Payment works like in a supermarket, after putting the number you will get a prompt on your phone to put in your PIN)`;
+                        messageToSend += `We are glad we managed to connect you with talent for your gig, we charge a small 9% finders fee, to notify the talent you have chosen them, kindly type pay to pay finder\'s fee, \nTo pay, type the ecocash number you are using to pay, e.g 0713020524, \n(Payment works like in a supermarket, after putting the number you will get a prompt on your phone to put in your PIN) \n\nN.B If its for accomodation, this payment is a subscription, meaning \nIf your budget is 10 and below you can be connected to up to 3 different people who can help you ,\nIf your budget is between 10 and 30, you can be connected for up to 7 people who can help you \nIf your budget is greater than 30 you can be connected for up to 13 people, \nCheck how gigz work on option 5 for more info`;
                         client.sendMessage(no, messageToSend).then((res) => {
                         }).catch(console.error);
                     }
@@ -1507,7 +1603,7 @@ client.on('message', async msg => {
                 });
 
 
-            } else if (query.substring(query.indexOf('@') + 1, query.length) == "profile" && query.substring(0, query.indexOf('@')).length == 13) { // see proposal bidder profile
+            } else if (query.substring(query.indexOf('@') + 1, query.length) === "profile" && query.substring(0, query.indexOf('@')).length === 13) { // see proposal bidder profile
                 var id = query.substring(0, query.indexOf('@'));
                 mongoWorker.getWorkerById(id).then((v) => {
 
@@ -1530,7 +1626,7 @@ client.on('message', async msg => {
                         // console.log("Res " + JSON.stringify(res));
                     }).catch(console.error);
                 });
-            } else if (query.substring(query.indexOf('@') + 1, query.length) == "reviews" && query.substring(0, query.indexOf('@')).length == 13) { // see proposal bidder reviews
+            } else if (query.substring(query.indexOf('@') + 1, query.length) === "reviews" && query.substring(0, query.indexOf('@')).length === 13) { // see proposal bidder reviews
                 var id = query.substring(0, query.indexOf('@'));
                 mongoWorker.getWorkerReviews(id).then((v) => {
 
@@ -1559,7 +1655,7 @@ client.on('message', async msg => {
                     }).catch(console.error);
 
                 });
-            } else if (query.substring(query.indexOf('@') + 1, query.length) == "history" && query.substring(0, query.indexOf('@')).length == 13) { // see worker history
+            } else if (query.substring(query.indexOf('@') + 1, query.length) === "history" && query.substring(0, query.indexOf('@')).length === 13) { // see worker history
                 var id = query.substring(0, query.indexOf('@'));
                 mongoGig.getWorkerHistory(id).then((v) => {
 
@@ -1587,7 +1683,7 @@ client.on('message', async msg => {
 
                     }).catch(console.error);
                 });
-            } else if (query.substring(query.indexOf('@') + 1, query.length) == "rate" && query.substring(0, query.indexOf('@')).length == 13) { // see proposal bidder reviews
+            } else if (query.substring(query.indexOf('@') + 1, query.length) === "rate" && query.substring(0, query.indexOf('@')).length === 13) { // see proposal bidder reviews
                 messages.push(query);
                 messageChain.set(no, messages);
                 messageToSend += `Thank you for rating the service you got, can you please type briefly what was your experience working with this person`;
@@ -1611,6 +1707,54 @@ client.on('message', async msg => {
                     });
 
                 }).catch(console.error);
+            } else if (query.toLowerCase() === "add") {
+                messages.push(query);
+                messageChain.set(no, messages);
+                messageToSend += `Can you type the full details of the property`;
+                client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                }).catch(console.error);
+            } else if (query.substring(query.indexOf('@') + 1, query.length - 14) === "interested" && query.substring(0, query.indexOf('@')).length === 13 && text.substring(text.indexOf('d') + 1, text.length).length === 13) { // Send bid invite
+
+                let propertyId = query.substring(query.indexOf('d') + 1, query.length);
+                let posterId = query.substring(0, query.indexOf('@'));
+                firebase.getRentalPropertyById(propertyId).then((querySnapshot) => {
+
+                    if (querySnapshot.empty) {
+                        messageToSend = "It appears the property is no longer available, you can check again later, or tomorrow";
+                        client.sendMessage(no, messageToSend).then((res) => {
+
+                        }).catch(console.error);
+                    } else {
+
+                        mongoWorker.getWorker(posterId).then((v) => {
+
+                            let propertyDesc = "";
+                            querySnapshot.forEach((doc) => {
+
+                                var info = doc.data();
+                                propertyDesc = `${info.description} `;
+
+
+                            });
+
+                            if (v != null) {
+                                //TODO Check if this person has a property gig, add to the text what they are offering, if there is no gig create one and send to this person??? then if this person says its available its a bid 
+                                let messageToSend = `I saw this property I am interested \n${propertyDesc.substring(0, propertyDesc.length - 115)} Is it still available? \nIf available click this link  \nhttps://wa.me/263713020524?text=`
+                            } else {
+
+                            }
+
+                        }).catch(console.error);
+
+                        client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                        }).catch(console.error);
+                    }
+
+                }).catch(console.error);
+
+
 
             } else {
 
@@ -1663,6 +1807,16 @@ function isValidDate(date) {
     return (new Date(date) !== "Invalid Date") && !isNaN(new Date(date));
 }
 
+function getDaysforGigDifference(date) {
+    var date1 = new Date();
+    var date2 = new Date(date);
+
+    // To calculate the time difference of two dates
+    var Difference_In_Time = date2.getTime() - date1.getTime();
+
+    return parseInt(Difference_In_Time / (1000 * 3600 * 24));
+}
+
 function getDaysDifference(date) {
     var date1 = new Date();
     var date2 = new Date(date);
@@ -1671,55 +1825,79 @@ function getDaysDifference(date) {
     var Difference_In_Time = date2.getTime() - date1.getTime();
 
     // To calculate the no. of days between two dates
-    return parseInt(Difference_In_Time / (1000 * 3600 * 24));
+    if (parseInt(Difference_In_Time / (1000 * 3600 * 24)) > 1) {
+        return `${parseInt(Difference_In_Time / (1000 * 3600 * 24))} days`;
+
+    } else if (parseInt(Difference_In_Time / (1000 * 3600 * 24)) === 1) {
+        return `${parseInt(Difference_In_Time / (1000 * 3600 * 24))} day`;
+    } else {
+        return `Few hours`;
+    }
 
 }
 
 async function messagePeople(el) {
-    console.log(el);
     try {
         var clients = await mongoWorker.getClientsBySkillsCat(el);
         if (clients != null && clients.length > 0) {
-            var messageToSend = `New Gig Alert \n\n${el.details}  \nBudget:${el.budget} ${el.paymentStructure}  \n${getDaysDifference(el.finalDay)} day(s) left to bid \nTo Bid for this gig click this link https://wa.me/263713020524?text=bid@${el.id} `;
+            var messageToSend = `New Gig Alert \n\n${el.details}  \nBudget:${el.budget} ${el.paymentStructure}  \n${getDaysDifference(el.finalDay)} left to bid \nTo Bid for this gig click this link https://wa.me/263713020524?text=bid@${el.id} `;
+            var alreadySent = [];
             clients.forEach(element => {
-                client.sendMessage(element.no, messageToSend).catch(console.error);
+
+                //Not in the array
+                if (alreadySent.indexOf(element.no) < 0) {
+
+                    client.sendMessage(element.no, messageToSend).then(() => {
+                        alreadySent.push(element.no);
+                    }).catch(console.error);
+
+                }
+
             });
 
             twitter.post('statuses/update', { status: messageToSend }, function (error, tweet, response) {
                 if (!error) {
                     console.log("Tweet sent");
                 }
-            })
-
-
-
-
-        }
-    } catch (e) {
-        console.error(e);
-    }
-
-
-}
-
-async function messageAccomodationPeople(house, contact) {
-    try {
-        var gigz = await mongoGig.getAccomodationGigz(house);
-        if (gigz != null && gigz.length > 0) {
-            gigz.forEach(element => {
-                // Will add this soon
-                // if (parseInt(element._doc.confidenceScore) > 50) {
-                var messageToSend = `Update from gigz \n\n${house}\n${contact} \n\nThis is to help connect you with agents.Gigz is not affiliated with this agent but they might be able to you get the exact accomodation you want`;
-                client.sendMessage(element.no, messageToSend).catch(console.error);
-                // }
-
             });
+
+
+            var mess = `Update from Gigz: Your Gig has been approved! \nYou should begin to get bids soon!`;
+
+            if (el.skills.toLowerCase().includes("accommodation") || el.skills.toLowerCase().includes("real estate") || el.skills.toLowerCase().includes("agent")) {
+                mess += `\nOur goal is to remove bogus agents from operating in this space, if the property you are moving from will become vacant after you move, or you know a vacant property and would like to help another tenant move there, click this link https://wa.me/263713020524?text=add \nYou will not only be helping stopping FRAUD and also you can do it part time, and the FULL FINDER'S FEE WILL BE YOURS making extra income`;
+            }
+            client.sendMessage(el.no, mess).catch(console.error);
+
+
+
+
         }
     } catch (e) {
         console.error(e);
     }
 
+
 }
+
+// async function messageAccomodationPeople(house, contact) {
+//     try {
+//         var gigz = await mongoGig.getAccomodationGigz(house);
+//         if (gigz != null && gigz.length > 0) {
+//             gigz.forEach(element => {
+//                 // Will add this soon
+//                 // if (parseInt(element._doc.confidenceScore) > 50) {
+//                 var messageToSend = `Update from gigz \n\n${house} \n\nThis is to help connect you with agents.Gigz is not affiliated with this agent but they might be able to you get the exact accomodation you want`;
+//                 client.sendMessage(element.no, messageToSend).catch(console.error);
+//                 // }
+
+//             });
+//         }
+//     } catch (e) {
+//         console.error(e);
+//     }
+
+// }
 
 async function checkChats() {
     var chats = await client.getChats();
@@ -1777,7 +1955,7 @@ app.post('/api/v1/delete', (req, res) => {
 
 
 app.post('/api/v1/addedhouse', (req, res) => {
-    messageAccomodationPeople(req.body.house, req.body.contact);
+    // messageAccomodationPeople(req.body.house, req.body.contact);
     var tweet = `${req.body.house.substring(0, 200)} Whatsapp 0713020524 for more leads`;
     twitter.post('statuses/update', { status: tweet }, function (error, tweet, response) {
         if (!error) {

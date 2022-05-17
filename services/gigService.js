@@ -4,13 +4,64 @@ module.exports = {
     addGig: function (gig) {
         return gig.save();
     },
-    getGigz: function (skills, category, no) { // show be able to to ensure Gig are approved and are not after the finalDay
+    getGigz: async function (skills, category, no) { // show be able to to ensure Gig are approved and are not after the finalDay
         // soon will add same category, for now leave like this
-        return Gig.fuzzySearch(skills).where('approved').equals(true).where('winner').equals("none").skip(no).limit(5).sort({ budget: -1 });
+        var splitSkills = [];
+        if (skills.includes(",")) {
+            splitSkills = skills.split(",");
+        } else {
+            splitSkills = skills.split(" ");
+        }
+
+        var gigz = [];
+        for (skill of splitSkills) {
+            var res = await Gig.find({ skills: { $regex: skill, $options: "i" } }).where('approved').equals(true).where('winner').equals("none").skip(no).limit(5).sort({ budget: -1 });
+            if (res.length === 5) {
+                return res;
+            } else if (res.length > 0) {
+                gigz.concat(res);
+                var limit = 5 - res.length;
+                var skip = no + res.length;
+                res = [];
+                res = await Gig.find({ skills: { $regex: skill, $options: "i" } }).where('approved').equals(true).where('winner').equals("none").skip(skip).limit(limit).sort({ budget: -1 });
+                gigz.concat(res);
+                return gigz;
+            } else {
+                res = [];
+                res = await Gig.find({ category: category }).where('approved').equals(true).where('winner').equals("none").skip(no).limit(5).sort({ budget: -1 });
+                if (res.length === 5) {
+                    return res;
+                } else if (res.length > 0) {
+                    gigz.concat(res);
+                    var limit = 5 - res.length;
+                    var skip = no + res.length;
+                    res = [];
+                    res = await Gig.find({}).where('approved').equals(true).where('winner').equals("none").skip(skip).limit(limit).sort({ budget: -1 });
+                    gigz.concat(res);
+                    return gigz;
+                } else {
+                    gigz = await Gig.find({}).where('approved').equals(true).where('winner').equals("none").skip(no).limit(5).sort({ budget: -1 });
+                    return gigz;
+                }
+
+            }
+            //
+
+        }
+
+
+        return gigz;
+        // return Gig.fuzzySearch(skills).where('approved').equals(true).where('winner').equals("none").skip(no).limit(5).sort({ budget: -1 });
 
     },
-    searchGigz: function (query, no) {
-        return Gig.fuzzySearch(query).where('approved').equals(true).where('winner').equals("none").skip(no).limit(5).sort({ budget: -1 });;
+    searchGigz: async function (query, no) {
+        var gigz = Gig.find({ skills: { $regex: query, $options: "i" } }).where('approved').equals(true).where('winner').equals("none").skip(no).limit(5).sort({ budget: -1 });
+        if (gigz.length === 5) {
+            return gigz;
+        } else {
+            return Gig.find({}).where('approved').equals(true).where('winner').equals("none").skip(no).limit(5).sort({ budget: -1 });
+
+        }
     },
     findGig: function (id) {
         return Gig.findOne({ id: id });
@@ -46,11 +97,11 @@ module.exports = {
         return Gig.deleteOne({ id: id });
     },
     getAccomodationGigz: function (house) {
-        return Gig.find({ category: "Facilities and property services", winner: "none", approved: true }).fuzzySearch(house);
+        return Gig.find({ category: "Facilities and property services", winner: "none", approved: true, skills: { $regex: query, $options: "i" } });
     },
     expire: async function () {
 
-        var expiredGigz = await Gig.find({ winner: "none", finalDay: { $lt: new Date() } });
+        var expiredGigz = await Gig.find({ winner: "none", approved: true, finalDay: { $lt: new Date() } });
         expiredGigz.forEach(async element => {
             var date1 = new Date();
             var date2 = new Date(element.finalDay);

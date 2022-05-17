@@ -1,5 +1,5 @@
 var mongoose = require('mongoose');
-const mongooseFuzzySearching = require('mongoose-fuzzy-searching');
+// const mongoose_fuzzy_searching = require('mongoose-fuzzy-searching-v3');
 var Schema = mongoose.Schema;
 
 var GigSchema = new Schema({
@@ -20,6 +20,6 @@ var GigSchema = new Schema({
 
 
 
-GigSchema.plugin(mongooseFuzzySearching, { fields: ['skills', 'category', 'details', 'budget'] });
+// GigSchema.plugin(mongoose_fuzzy_searching, { fields: ['skills', 'category', 'details', 'budget'] });
 // Export model.
 module.exports = mongoose.model('Gig', GigSchema, 'gigs');	
