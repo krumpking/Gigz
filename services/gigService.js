@@ -19,12 +19,12 @@ module.exports = {
             if (res.length === 5) {
                 return res;
             } else if (res.length > 0) {
-                gigz.concat(res);
+                gigz = gigz.concat(res);
                 var limit = 5 - res.length;
                 var skip = no + res.length;
                 res = [];
                 res = await Gig.find({ skills: { $regex: skill, $options: "i" } }).where('approved').equals(true).where('winner').equals("none").skip(skip).limit(limit).sort({ budget: -1 });
-                gigz.concat(res);
+                gigz = gigz.concat(res);
                 return gigz;
             } else {
                 res = [];
@@ -32,12 +32,12 @@ module.exports = {
                 if (res.length === 5) {
                     return res;
                 } else if (res.length > 0) {
-                    gigz.concat(res);
+                    gigz = gigz.concat(res);
                     var limit = 5 - res.length;
                     var skip = no + res.length;
                     res = [];
                     res = await Gig.find({}).where('approved').equals(true).where('winner').equals("none").skip(skip).limit(limit).sort({ budget: -1 });
-                    gigz.concat(res);
+                    gigz = gigz.concat(res);
                     return gigz;
                 } else {
                     gigz = await Gig.find({}).where('approved').equals(true).where('winner').equals("none").skip(no).limit(5).sort({ budget: -1 });
@@ -131,7 +131,10 @@ module.exports = {
         const filter = { id: gig.id };
         const update = { acceptingTimes: newAcceptingTimes };
         return Gig.findOneAndUpdate(filter, update);
-    }
+    },
+    findGigByPosterId: function (no) {
+        return Gig.find({ no: no, approved: true });
+    },
 
 
 

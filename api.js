@@ -363,6 +363,74 @@ client.on('message', async msg => {
                 client.sendMessage(msg.from, messageToSend).then((res) => {
 
                 }).catch(console.error);
+
+            } else if (query.substring(query.indexOf('@') + 1, query.length - 13) === "interested" && query.substring(0, query.indexOf('@')).length === 13 && query.substring(query.indexOf('d') + 1, query.length).length === 13) { // Send bid invite
+                messageChain.delete(no);
+                messages = [];
+                messages.push(query);
+                messageChain.set(no, messages);
+                return mongoGig.findGigByPosterId(no).then((res) => {
+
+                    if (res.length > 0) {
+                        res.forEach(el => {
+                            if (el.category.includes("Facilities and property services") && el.skills.toLowerCase().includes("accomodation") || el.skills.includes("accommodation") || el.skills.includes("real estate") || el.skills.toLowerCase().includes("agent") || el.skills.toLowerCase().includes("agents")) {
+                                let propertyId = query.substring(query.indexOf('d') + 1, query.length);
+                                let posterId = query.substring(0, query.indexOf('@'));
+
+                                return firebase.getRentalPropertyById(propertyId).then((querySnapshot) => {
+
+                                    if (querySnapshot.empty) {
+                                        messageToSend = "It appears the property is no longer available, you can check again later, or tomorrow";
+                                        client.sendMessage(no, messageToSend).then((res) => {
+
+                                        }).catch(console.error);
+                                    } else {
+
+                                        return mongoWorker.getWorkerById(posterId).then((v) => {
+
+                                            let propertyDesc = "";
+                                            querySnapshot.forEach((doc) => {
+
+                                                var info = doc.data();
+                                                propertyDesc = `${info.description} `;
+
+
+                                            });
+
+                                            if (v != null) {
+                                                //TODO Check if this person has a property gig, add to the text what they are offering, if there is no gig create one and send to this person??? then if this person says its available its a bid 
+                                                messageToSend = `I saw this property \n\n${propertyDesc.substring(0, propertyDesc.length - 115)} \n\nIs it still available? If it is available here is my offer, please *click the link*(link below) and type Property Available if it is still available  \n\n${el.details} \nBudget:${el.budget}USD ${el.paymentStructure}  \n${getDaysDifference(el.finalDay)} left to bid\nTo Bid for this gig(IF AVAILABLE CLICK THIS LINK and type Property Available) click this link https://wa.me/263713020524?text=bid@${el.id}`;
+                                            } else {
+                                                messageToSend = `It appears we could not find the person who posted this property, please try again later, or file a report by typing #, then type hi, then after the welcome message type 6, to send us feedback`;
+
+                                            }
+                                            client.sendMessage(v[0].no, messageToSend).then((res) => {
+
+                                            }).catch(console.error);
+
+                                            let mess = "The person has been notified of your interest";
+                                            client.sendMessage(no, mess).then((res) => {
+
+                                            }).catch(console.error);
+
+                                        }).catch(console.error);
+
+
+                                    }
+
+                                }).catch(console.error);
+                            }
+
+                        });
+
+                    } else {
+                        messageToSend = "It appears you are yet to create a gig, you need to create a gig before you can send a message of your interest to this person. \nGigz help you get accomodation through posting a gig \nA gig is like asking someone to look/search for accomodation for you, and you pay them after they get you a property, you are the one who decides what's the best amount you would want to give to the person who helps you.So you post the gig on the Whatsapp system.We have people who are registered who can help you, so when they see your gig, they send you a message of what they have and you decide to accept that house/room or not, and select the one you like, and after you choose the person who will help you, you also get a chance to come back and write a review about them, you also are encouraged to sign an affidavit with the person so you have better protection from being scammed \nThe option to post a gig is option 1 on the welcome message, so to post a gig, type hi, then type 1 and answer the few questions that follow  \n\nWe also understand that you may not like the first house/room you see, so we have made our finders fee effectivelly a subscription, \nwhere if your budget for the person who will help you is less than 10, once you pay finders fee you get connected to up to 3 houses/rooms of your choice you get connect automatically the moment you accept a bid(How to accept a bid is explained on the bid message), \nIf you budget is between 10 and 30 you also get to choose up to 7 houses/rooms of your choice automatically after you make your payment  \nIf you budget is above 30 you get connected to landlords/agents/other tenants of up to 13 houses/rooms  \nThis finders fee will be valid for as long as your gig is still running and you have been connected to less houses/rooms than the above mentioned.Meaning it will last for as long as you want it to N.B We encourage you to have a gig for atleast 3 weeks, to ensure you find the place to call your home \nAlso you can post a gig for someone to help you move, when you have to move"
+                        client.sendMessage(no, messageToSend).then((res) => {
+
+                        }).catch(console.error);
+                    }
+
+                }).catch(console.error);
             } else {
 
                 switch (messages.length) {
@@ -714,8 +782,9 @@ client.on('message', async msg => {
                                     mongoWorker.getWorker(no).then((v) => {
 
                                         if (v != null) {
-                                            query += `\nIf you are interested in this click this link https://wa.me/263713020524?text=${v.id}@interested${milliSecondsSinceEpochPropID}`;
-                                            firebase.addRentalProperty(day, "Harare", query, no, milliSecondsSinceEpochPropID).then((r) => {
+                                            let property = query;
+                                            property += `\nIf you are interested in this click this link https://wa.me/263713020524?text=${v.id}@interested${milliSecondsSinceEpochPropID}`;
+                                            firebase.addRentalProperty(day, "Harare", property, no, milliSecondsSinceEpochPropID).then((r) => {
                                                 messageToSend = `Your property has been added, and will be posted after it is approved!`;
                                                 client.sendMessage(msg.from, messageToSend).then((res) => {
                                                     let mess = `${no} added ${query}`;
@@ -743,8 +812,9 @@ client.on('message', async msg => {
                                             });
 
                                             mongoWorker.saveWorker(worker).then((v) => {
-                                                query += `\nIf you are interested in this click this link https://wa.me/263713020524?text=${v.id}@interested${milliSecondsSinceEpochPropID}`;
-                                                firebase.addRentalProperty(day, "Harare", query, no, milliSecondsSinceEpochPropID).then((r) => {
+                                                let property = query;
+                                                property += `\nIf you are interested in this click this link https://wa.me/263713020524?text=${v.id}@interested${milliSecondsSinceEpochPropID}`;
+                                                firebase.addRentalProperty(day, "Harare", property, no, milliSecondsSinceEpochPropID).then((r) => {
                                                     messageToSend = `Your property has been added, and will be posted after it is approved!`;
                                                     client.sendMessage(msg.from, messageToSend).then((res) => {
                                                         let mess = `${no} added ${query}`;
@@ -1493,7 +1563,6 @@ client.on('message', async msg => {
 
             }
         } else {
-
             if (query.toLowerCase() == "buy") {
                 messageChain.delete(no);
                 messages.push("First message");
@@ -1714,45 +1783,73 @@ client.on('message', async msg => {
                 client.sendMessage(msg.from, messageToSend).then((res) => {
 
                 }).catch(console.error);
-            } else if (query.substring(query.indexOf('@') + 1, query.length - 14) === "interested" && query.substring(0, query.indexOf('@')).length === 13 && text.substring(text.indexOf('d') + 1, text.length).length === 13) { // Send bid invite
+            } else if (query.substring(query.indexOf('@') + 1, query.length - 13) === "interested" && query.substring(0, query.indexOf('@')).length === 13 && query.substring(query.indexOf('d') + 1, query.length).length === 13) { // Send bid invite
+                messages.push(query);
+                messageChain.set(no, messages);
+                return mongoGig.findGigByPosterId(no).then((res) => {
 
-                let propertyId = query.substring(query.indexOf('d') + 1, query.length);
-                let posterId = query.substring(0, query.indexOf('@'));
-                firebase.getRentalPropertyById(propertyId).then((querySnapshot) => {
+                    if (res.length > 0) {
+                        res.forEach(el => {
+                            if (el.category.includes("Facilities and property services") && el.skills.toLowerCase().includes("accomodation") || el.skills.includes("accommodation") || el.skills.includes("real estate") || el.skills.toLowerCase().includes("agent") || el.skills.toLowerCase().includes("agents")) {
+                                let propertyId = query.substring(query.indexOf('d') + 1, query.length);
+                                let posterId = query.substring(0, query.indexOf('@'));
 
-                    if (querySnapshot.empty) {
-                        messageToSend = "It appears the property is no longer available, you can check again later, or tomorrow";
-                        client.sendMessage(no, messageToSend).then((res) => {
+                                return firebase.getRentalPropertyById(propertyId).then((querySnapshot) => {
 
-                        }).catch(console.error);
-                    } else {
+                                    if (querySnapshot.empty) {
+                                        messageToSend = "It appears the property is no longer available, you can check again later, or tomorrow";
+                                        client.sendMessage(no, messageToSend).then((res) => {
 
-                        mongoWorker.getWorker(posterId).then((v) => {
+                                        }).catch(console.error);
+                                    } else {
 
-                            let propertyDesc = "";
-                            querySnapshot.forEach((doc) => {
+                                        return mongoWorker.getWorkerById(posterId).then((v) => {
 
-                                var info = doc.data();
-                                propertyDesc = `${info.description} `;
+                                            let propertyDesc = "";
+                                            querySnapshot.forEach((doc) => {
+
+                                                var info = doc.data();
+                                                propertyDesc = `${info.description} `;
 
 
-                            });
+                                            });
 
-                            if (v != null) {
-                                //TODO Check if this person has a property gig, add to the text what they are offering, if there is no gig create one and send to this person??? then if this person says its available its a bid 
-                                let messageToSend = `I saw this property I am interested \n${propertyDesc.substring(0, propertyDesc.length - 115)} Is it still available? \nIf available click this link  \nhttps://wa.me/263713020524?text=`
-                            } else {
+                                            if (v != null) {
+                                                //TODO Check if this person has a property gig, add to the text what they are offering, if there is no gig create one and send to this person??? then if this person says its available its a bid 
+                                                messageToSend = `I saw this property \n\n${propertyDesc.substring(0, propertyDesc.length - 115)} \n\nIs it still available? If it is available here is my offer, please *click the link*(link below) and type Property Available if it is still available  \n\n${el.details} \nBudget:${el.budget}USD ${el.paymentStructure}  \n${getDaysDifference(el.finalDay)} left to bid\nTo Bid for this gig(IF AVAILABLE CLICK THIS LINK and type Property Available) click this link https://wa.me/263713020524?text=bid@${el.id}`;
+                                            } else {
+                                                messageToSend = `It appears we could not find the person who posted this property, please try again later, or file a report by typing #, then type hi, then after the welcome message type 6, to send us feedback`;
 
+                                            }
+                                            client.sendMessage(v[0].no, messageToSend).then((res) => {
+
+                                            }).catch(console.error);
+
+                                            let mess = "The person has been notified of your interest";
+                                            client.sendMessage(no, mess).then((res) => {
+
+                                            }).catch(console.error);
+
+                                        }).catch(console.error);
+
+
+                                    }
+
+                                }).catch(console.error);
                             }
 
-                        }).catch(console.error);
+                        });
 
-                        client.sendMessage(msg.from, messageToSend).then((res) => {
+                    } else {
+                        messageToSend = "It appears you are yet to create a gig, you need to create a gig before you can send a message of your interest to this person. \nGigz help you get accomodation through posting a gig \nA gig is like asking someone to look/search for accomodation for you, and you pay them after they get you a property, you are the one who decides what's the best amount you would want to give to the person who helps you.So you post the gig on the Whatsapp system.We have people who are registered who can help you, so when they see your gig, they send you a message of what they have and you decide to accept that house/room or not, and select the one you like, and after you choose the person who will help you, you also get a chance to come back and write a review about them, you also are encouraged to sign an affidavit with the person so you have better protection from being scammed \nThe option to post a gig is option 1 on the welcome message, so to post a gig, type hi, then type 1 and answer the few questions that follow  \n\nWe also understand that you may not like the first house/room you see, so we have made our finders fee effectivelly a subscription, \nwhere if your budget for the person who will help you is less than 10, once you pay finders fee you get connected to up to 3 houses/rooms of your choice you get connect automatically the moment you accept a bid(How to accept a bid is explained on the bid message), \nIf you budget is between 10 and 30 you also get to choose up to 7 houses/rooms of your choice automatically after you make your payment  \nIf you budget is above 30 you get connected to landlords/agents/other tenants of up to 13 houses/rooms  \nThis finders fee will be valid for as long as your gig is still running and you have been connected to less houses/rooms than the above mentioned.Meaning it will last for as long as you want it to N.B We encourage you to have a gig for atleast 3 weeks, to ensure you find the place to call your home \nAlso you can post a gig for someone to help you move, when you have to move"
+                        client.sendMessage(no, messageToSend).then((res) => {
 
                         }).catch(console.error);
                     }
 
                 }).catch(console.error);
+
+
 
 
 
@@ -1846,9 +1943,9 @@ async function messagePeople(el) {
 
                 //Not in the array
                 if (alreadySent.indexOf(element.no) < 0) {
-
+                    alreadySent.push(element.no);
                     client.sendMessage(element.no, messageToSend).then(() => {
-                        alreadySent.push(element.no);
+
                     }).catch(console.error);
 
                 }
