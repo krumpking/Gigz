@@ -4,7 +4,7 @@ var Schema = mongoose.Schema;
 
 var WorkerSchema = new Schema({
     name: { type: String, required: true },
-    skills: { type: String },
+    skills: { type: String, index: 'text' },
     category: { type: String, required: true },
     brief: { type: String, required: true },
     no: { type: String, required: true },
@@ -19,4 +19,4 @@ var WorkerSchema = new Schema({
 
 // WorkerSchema.plugin(mongoose_fuzzy_searching, { fields: ['skills', 'category'] });
 // Export model.
-module.exports = mongoose.model('Worker', WorkerSchema, 'workers');	
+module.exports = mongoose.model('Worker', WorkerSchema, 'workers');

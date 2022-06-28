@@ -76,7 +76,8 @@ module.exports = {
     },
     getWorkerHistory: function (id) {
         return Gig.find({
-            winnner: id
+            winner: id,
+            approved: false
         }).limit(7);
     },
     getGigsToApproval: function (skipNumber) {
