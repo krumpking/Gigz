@@ -1,58 +1,37 @@
 const express = require("express");
-const bodyParser = require("body-parser");
 const fs = require('fs');
-const axios = require('axios');
 const shelljs = require('shelljs');
 const qrcode = require('qrcode-terminal');
 const { Client, MessageMedia } = require('whatsapp-web.js');
-const config = require('./config.json');
-const { Paynow } = require("paynow");
-const randomString = require('random-string');
 const cors = require('cors');
 const system = require('system-commands');
-const firebase = require('./services/firebase.js');
-const mongoWorker = require('./services/workerService.js');
-const mongoGig = require('./services/gigService.js');
-const Worker = require('./models/workerModel.js');
-const Gig = require('./models/gigModel.js');
-const Review = require('./models/reviewsModel.js');
+const config = require('./config.json');
+const paymentService = require("./services/paymentService");
+const Payment = require("./models/paymentModel");
 const initConnection = require('./config/config');
-var mongoose = require('mongoose');
-const Twitter = require('twitter');
-const FB = require('fb');
-const Report = require("./models/reportsModel");
-const reportsService = require("./services/reportsService");
-
-
+const { Paynow } = require("paynow");
+const axios = require('axios');
+const mongoWorker = require('./services/workerService.js');
+const workerService = require("./services/workerService.js");
+const { url } = require("inspector");
+const reviewsModel = require("./models/reviewsModel");
+const portfolioModel = require("./models/portfolioModel");
+const QGenerator = require('./services/qGenerator');
 
 
 initConnection();
 
 
-
-
-
 process.title = "whatsapp-node-api";
-global.client = new Client({ qrTimeoutMs: 0, puppeteer: { headless: true } });
+global.client = new Client({ qrTimeoutMs: 0, puppeteer: { headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--unhandled-rejections=strict'] } });
 ///
 global.authed = false;
 const app = express();
 
 
-/**
- *  Initiating paynow
- */
-const paynow = new Paynow("4114", "857211e6-052f-4a8a-bb42-5e0d0d9e38e7");
 
-const ACCESS_TOKEN = "EAAFnbEUHkZAsBAGZCxNq7wKhNrOoln7hDtPGXE8Axn2WZBhrRndo4RKWLdpHEuBrothGAWRlEEB0ywunx6X6k4ZC0MsZBOZAj20xRMlwCOkBAe8dmpsxaKgCbZBp1ZCdVsZB6XiBIOkpqGyQd9tZAXDSZCyGEVOM7xxxBEy2ssZChcFCvEQax0Kq89mEAWigBDEv4aas1UuzTXD8gAZDZD";
 
-//Initialize Twitter 
-var twitter = new Twitter({
-    consumer_key: "Zc4QD26rL8u2RIRaexplwufjg",
-    consumer_secret: "QHp46Mxx1jVlgPxQ782UCPqhJ5MeX99SKDMZSdtP7oXVEoIPZD",
-    access_token_key: "1413157886566535182-3kC9tBGE59mhxsr5o23NjhWuJEfKJO",
-    access_token_secret: "VMsSY66ko5y23ijJxdix18uCQlWL9dXcOmozU08ikBj2D"
-});
+
 
 
 const port = process.env.PORT || config.port;
@@ -63,14 +42,23 @@ client.initialize();
 client.on('qr', qr => {
     // console.log("initialize QR")
     qrcode.generate(qr, { small: true });
-    // fs.writeFileSync('./components/last.qr', qr);
+    fs.writeFileSync('./components/last.qr', qr);
 });
 
 
 
 client.on('authenticated', (session) => {
     console.log("AUTH HAS WORKED!");
-
+    // sessionCfg = session;
+    // fs.writeFile(SESSION_FILE_PATH, JSON.stringify(session), function(err) {
+    //     if (err) {
+    //         console.error(err);
+    //     }
+    //     authed=true;
+    // });
+    // try{
+    //     fs.unlinkSync('./components/last.qr')
+    // }catch(err){}
 });
 
 client.on('auth_failure', () => {
@@ -79,1215 +67,890 @@ client.on('auth_failure', () => {
     process.exit()
 });
 
-client.on('ready', () => {
-    console.log('Client is running!');
+
+
+
+
+var sentMessages = 0;
+
+
+client.on('ready', async () => {
+    console.log('Gigz is running!');
+
+
 });
+
+
 
 client.on('disconnected', (reason) => {
     console.log('Client was logged out', reason);
 });
 
 
-var myProperties = new Map();
-var agentExp = new Map();
-var subExp = new Map();
-var payments = new Map();
+
 var messageChain = new Map();
-var clientMap = new Map();
-var myGigsMap = new Map();
-var seenGigzMap = new Map();
-var mainAd = "#Believe";
-var subCounter = 0;
-var adsForClient = new Map();
-var messageCounterMap = new Map();
 var invoice = new Date().getTime().toString();
+const zwlPrice = 600;
 var pollUrl = "";
-const zwlPrice = 400;
-const ourContact = "263719066282@c.us";
+var seenProfilesMap = new Map();
+var clientMap = new Map();
+var attachmentData = {};
 
 client.on('message', async msg => {
 
-    if (msg.from.length < 23) {
+    // const no = msg.from;
+    // var messages = [];
+    // const invoiceData = {
+    //     addresses: {
+    //         shipping: {
+    //             name: 'John Doe',
+    //             address: '2400 Fulton Street',
+    //             city: 'San Francisco',
+    //             state: 'CA',
+    //             country: 'US',
+    //             postalCode: 94118
+    //         },
+    //         billing: {
+    //             name: 'John Doe',
+    //             address: '2400 Fulton Street',
+    //             city: 'San Francisco',
+    //             state: 'CA',
+    //             country: 'US',
+    //             postalCode: 94118
+    //         }
+    //     },
+    //     memo: 'As discussed',
+    //     items: [{
+    //         itemCode: 12341,
+    //         description: 'Laptop Computer',
+    //         quantity: 2,
+    //         price: 3000,
+    //         amount: 6000
+    //     }, {
+    //         itemCode: 12342,
+    //         description: 'Printer',
+    //         quantity: 1,
+    //         price: 2000,
+    //         amount: 2000
+    //     }
+    //     ],
+    //     subtotal: 8000,
+    //     paid: 0,
+    //     qNumber: 1234,
+    //     dueDate: `${new Date().getMonth() + 1}/${new Date().getDate()}/${new Date().getFullYear()}`
+    // }
 
-        /// A unique identifier for the given session
-        const sessionId = randomString({ length: 20 });
-        const query = msg.body;
-        const no = msg.from;
+    // const qg = new QGenerator(invoiceData)
+    // qg.generate();
+    // messages.push("1");
+    // if (!messageChain.has(no)) {
+    //     messageChain.set(no, messages);
+    // }
+
+
+    // if (messageChain.has(no) && ) {
+    // const media = MessageMedia.fromFilePath(`./Quotation 1234.pdf`);
+    // client.sendMessage(msg.from, media, { caption: "Test Document" }).catch(console.error);
+    // }
 
 
 
-        const user = await msg.getContact();
 
-        var name = user.pushname;
-        if (name === undefined || name === Object.keys(user).length === 0) {
-            name = "";
-        }
-
-
-        // array message
-        var messageToSend = "";
-        var messages = [];
+    // Check for media
+    if (msg.hasMedia) {
+        attachmentData = await msg.downloadMedia();
+    }
 
 
 
-        // check if user has sent a message to the app before
-        if (messageChain.has(no)) {
-            messages = messageChain.get(no);
 
 
 
-            if (query === "#") {
-                messageToSend += "You have restarted.\nType hi message to continue or click link below \nhttps://wa.me/263713020524?text=hie";
-                messageChain.delete(no);
-                messages = [];
-                client.sendMessage(msg.from, messageToSend).then((res) => {
-                    // console.log("Res " + JSON.stringify(res));
-                }).catch((e) => {
-                    console.error(e);
-                    messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
 
-                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                        // console.log("Res " + JSON.stringify(res));
-                    }).catch((err) => {
-                        console.error(err);
-                    });
-                });
-            } else if (query.toLowerCase() == "unsubscribe" || query.toLowerCase() == "unsubs" || query.toLowerCase() == "unsub") {
-                mongoWorker.unsubscribe(no).then((res) => {
-                    messageToSend += "It was an honor to serve you, all the best in the next part of your journey";
+    /// A unique identifier for the given session
+    // const sessionId = randomString({ length: 20 });
+    const query = msg.body;
+    const no = msg.from;
+
+
+
+    const user = await msg.getContact();
+
+    var name = user.pushname;
+    if (name === undefined || name === Object.keys(user).length === 0) {
+        name = "";
+    }
+
+
+    // array message
+    var messageToSend = "";
+    var messages = [];
+
+
+    if (msg.from.length < 23 && msg.from.includes("@c")) {
+
+
+        if (query.substring(query.indexOf("@"), query.length).toLowerCase() === "@va" && query.includes("@va")) { // Virtual Assistant channel
+            messageChain.delete(no);
+            let businessName = query.substring(0, query.indexOf("@va"))
+            mongoWorker.checkName(businessName).then((r) => {
+
+                if (r === null) {
+                    messageToSend = `Pleasant ${timeOfDay} ${name}, it appears that Virtual Assistant is no longer operational, kindly contact the person who gave you the link to find out if it is still operational`;
                     messageChain.delete(no);
-                    messages = [];
-                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                        // console.log("Res " + JSON.stringify(res));
-                    }).catch((err) => {
-                        console.log(e);
-                        messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                        messageChain.delete(no);
-                        client.sendMessage(msg.from, messageToSend).then((res) => {
-                            // console.log("Res " + JSON.stringify(res));
-                        }).catch(console.error);
-                    });
-
-                }).catch(console.error);
-            } else if (query.toLowerCase() == "buy") {
-                messages = [];
-                messageChain.delete(no);
-                messages.push("First message");
-                messageChain.set(no, messages);
-                messageToSend += "Please enter your ecocash number, it works the same way as in a supermarket, you enter your number and you get a prompt to enter your PIN  e.g 0777123123,   \n\nYou can Restart(type *#* to restart) ";
-                client.sendMessage(msg.from, messageToSend).then((res) => {
-                    // console.log("Res " + JSON.stringify(res));
-                }).catch(console.error);
-            } else if (query.substring(query.indexOf('@') + 1, query.length).length === 13 && query.substring(0, query.indexOf('@')) === "bid") { // bid for a gig
-                messageChain.delete(no);
-                messages = [];
-                mongoWorker.getWorker(no).then((v) => {
-                    if (v != null) {
-                        clientMap.set(no, v);
-                        if (v.bids > 0) {
-
-                            mongoGig.findGig(query.substring(query.indexOf('@') + 1, query.length)).then((v) => {
-
-                                if (v != null) {
-                                    messages.push(query);
-                                    messageChain.set(no, messages);
-                                    myGigsMap.set(no, v);
-                                    let el = v;
-                                    messageToSend += `This is the gig you want to bid for \n\nYOU GET:${calculateMyCompensation(el.budget)}USD ${el.paymentStructure} \n${el.details}  \n${getDaysDifference(el.finalDay)} left to bid \n\n`;
-                                    messageToSend += `Type your bid(a message with your application/proposal for the gig(job)) for the gig, this means basically, typing to the person offering the gig, why they should give you this task and not anyone else,type your bid(proposal/application) right after this message,whatever you type after this message is going to be sent to the person who posted this gig \n\nIf this is not what you want type # to restart`;
-                                } else {
-                                    messageToSend += `The gig you typed has not been found, please check the link again or type # to restart`;
-                                }
-
-
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                }).catch(console.error);
-
-
-                            }).catch((e) => {
-                                console.error(e);
-                                messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                                messageChain.delete(no);
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                    // console.log("Res " + JSON.stringify(res));
-                                }).catch(console.error);
-
-                            });
-
-                        } else {
-                            messageToSend += `It appears you are out of bids, you can buy more bids just 100RTGS Ecoash for 5 bids,to buy type Buy or click this link to https://wa.me/263713020524?text=Buy `;
-                            client.sendMessage(msg.from, messageToSend).then((res) => {
-                            }).catch(console.error);
-                        }
-
+                } else {
+                    clientMap.set(no, r);
+                    messages.push(query);
+                    messageChain.set(no, messages);
+                    var timeOfDay = "";
+                    if (new Date().getHours() < 12) {
+                        timeOfDay = "Morning";
+                    } else if (new Date().getHours() > 12 && new Date().getHours() < 16) {
+                        timeOfDay = "Afternoon";
                     } else {
-                        messageToSend += `It appears you do not have any account with us, to able to bid you need to have an account, to create an account, after this message, type hi, and select option 2 `;
-                        messageChain.delete(no);
-                        client.sendMessage(msg.from, messageToSend).then((res) => {
-                        }).catch(console.error);
+                        timeOfDay = "Day";
                     }
 
+                    messageToSend = `Pleasant ${timeOfDay} ${name}, welcome to ${businessName}'s Virtual Assistant \n\n \n*1* About ${businessName} \n*2* See services \n*3* Frequently asked questons   \n\nSend the number of the option you want, e.g send 2 if you want to see ${businessName}'s services`;
+                }
+                client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                }).catch(console.error);
+            }).catch(console.error);
+
+
+
+
+
+
+
+        } else if (query === "#") { // Restart coversation
+            messageToSend = "You have restarted.\nType hi message to continue or click link below \nhttps://wa.me/263713020524?text=hie";
+            messageChain.delete(no);
+
+            client.sendMessage(msg.from, messageToSend).then((res) => {
+                // console.log("Res " + JSON.stringify(res));
+            }).catch((e) => {
+                console.error(e);
+                messageToSend = "Oooops looks like there was an error, please try again, by sending a new message ";
+
+                client.sendMessage(msg.from, messageToSend).then((res) => {
+                    // console.log("Res " + JSON.stringify(res));
+                }).catch((console.error));
+            });
+        } else if (query.substring(query.indexOf('@') + 1, query.length) === "profile" && query.substring(0, query.indexOf('@')).length === 13) {
+            messageChain.delete(no);
+            var id = query.substring(0, query.indexOf('@'));
+            mongoWorker.getWorkerById(id).then((v) => {
+                if (v.package === "7.99") {
+                    website = `${v.name}.gigz.co.zw`;
+                }
+                messageToSend = `Name: ${v.name} \nBrief Intro:${v.brief} \nServices: ${v.skills} \nAreas able to serve: ${v.areas} \nTo see their reviews click \nhttps://wa.me/263713020524?text=${v.name}@reviews \nTo chat to their virtual assistant click \nhttps://wa.me/263713020524?text=${v.name}@va   ${website} \n_Contact_: https://wa.me/${el.no.substring(0, el.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Gigz+I+am+interested+in+your+services`;
+                client.sendMessage(v.no, messageToSend).then((res) => {
+                    // console.log("Res " + JSON.stringify(res));
                 }).catch(console.error);
 
-            } else if (query.substring(query.indexOf('@') + 1, query.length - 17) === "accept" && query.substring(0, query.indexOf('@')).length === 13) { // accept bid 
+            }).catch((e) => {
+                console.log(e);
+                messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
                 messageChain.delete(no);
-                messages = [];
-                messages.push(query);
-                messageChain.set(no, messages);
-                var id = messages[0].substring(0, messages[0].indexOf('@'));
-                mongoWorker.getWorkerById(id).then((v) => {
-                    messageToSend += `Congratulations your bid was accepted, remember to ask them to give you review, as that will improve your chances of getting more and more gigz and build your port-folio, our team will be in touch with you about Gigz commission, failure to pay it after getting paid will result in this number being permanantly blocked from our service, we only work with genuine people, this is part of the test`;
-                    client.sendMessage(v[0].no, messageToSend).then((res) => {
-                        // console.log("Res " + JSON.stringify(res));
-                        var mess = `We are glad we connected you to the right person, however we highly recommended signing the affidavit below with clear milestones on the task.Thank you accepting this person's bid, you can contact the person who sent the bid(proposal) on +${v[0].no.substring(0, no.indexOf('@'))} , remember to leave a review after the task is done(Our team will contact you to ask about your experience), this helps the person build a portfolio and helps them connect with other people who need the same work done \nTo Review click https://wa.me/263713020524?text=${v[0].id}@rate`;
-                        client.sendMessage(no, mess).then((res) => {
+                client.sendMessage(msg.from, messageToSend).then((res) => {
+                    // console.log("Res " + JSON.stringify(res));
+                }).catch(console.error);
+            });
+        } else if (query.toLowerCase() === "subscribe") { // subscribe to service
+            messageChain.delete(no); //Ensure all previous messages are deleted
+            messages.push(query);
+            messageChain.set(no, messages);
+            messageToSend = "Please select the package you would like to subscribe to \n\n \n*1* Profile and Virtual Assistant for 5.99USD p.m only \n*2* Profile , Virtual Assistant and Web page for 7.99USD p.m \n*3* Custom solution to improve your services  \n\nTo choose any option send a number eng. 2 to get pay for a Profile, Virtual Assistant and a Web page \n\nTerms and Conditions Apply, to see them send Terms or click this link https://wa.me/263713020524?text=terms";
 
-                        }).catch(console.error);
-                        var gigId = query.substring(query.indexOf('t') + 1, query.indexOf('@gig'));
-                        mongoGig.addWorkHistory(id, gigId).catch(console.error);
-                    }).catch(console.error);
-                    var mediaMessage = "Take advantage of the affidavit sent to you, to sign agreement before the task starts, ensure the task is clearly communicated to avoid problems after";
-                    const media = MessageMedia.fromFilePath('./gigzaffidavit.pdf');
-                    client.sendMessage(v[0].no, media, { caption: mediaMessage }).catch(console.error);
-                    client.sendMessage(no, media, { caption: mediaMessage }).catch(console.error);
-                    messageChain.delete(no);
+            client.sendMessage(msg.from, messageToSend).then((res) => {
+                // console.log("Res " + JSON.stringify(res));
+            }).catch((console.error));
+        } else if (query.toLowerCase() === "terms") {
+            messageChain.delete(no);
+            messageToSend = "Terms";
+            client.sendMessage(msg.from, messageToSend).then((res) => {
+                // console.log("Res " + JSON.stringify(res));
+            }).catch((console.error));
+        } else if (query.substring(query.indexOf('@') + 1, query.length) === "portfolio" && query.includes("@portfolio")) {
+            messageChain.delete(no);
+            messages.push(query);
+            messageChain.set(no, messages);
+            messageToSend = "You want to add to your portfolio which showcases the work you have done, great, we take one picture per description, we advise you to post *only the best pictures*";
+            client.sendMessage(msg.from, messageToSend).then((res) => {
+                // console.log("Res " + JSON.stringify(res));
+            }).catch((console.error));
+        } else if (query.substring(query.indexOf('@') + 1, query.length) === "pic" && query.substring(0, query.indexOf('@')).length === 13) {
+            messageChain.delete(no);
+            messages.push(query);
+            messageChain.set(no, messages);
+            messageToSend = "You want to add your picture, great, send your picture now";
+            client.sendMessage(msg.from, messageToSend).then((res) => {
+                // console.log("Res " + JSON.stringify(res));
+            }).catch((console.error));
+        } else if (query.substring(query.indexOf('@') + 1, query.length) === "rate" && query.includes("@rate")) { // rate or put recommendations
+            messageChain.delete(no);
+            let username = query.substring(0, query.indexOf('@'));
+            mongoWorker.checkName(username).then((v) => {
 
-
-
-
-
-                }).catch((e) => {
-                    console.error(e);
-                    messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                    messageChain.delete(no);
-                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                        // console.log("Res " + JSON.stringify(res));
-                    }).catch(console.error);
-
-                });
-
-
-            } else if (query.substring(query.indexOf('@') + 1, query.length) === "profile" && query.substring(0, query.indexOf('@')).length === 13) { // see proposal bidder profile
-                messages = [];
-                messageChain.delete(no);
-                var id = query.substring(0, query.indexOf('@'));
-                mongoWorker.getWorkerById(id).then((v) => {
-                    messageToSend += `Full Name: ${v.name} \nBrief Intro:${v.brief} \nSkills: ${v.skills} \nAreas able to carry out tasks: ${v.areas} \nTo see their task history click \nhttps://wa.me/263713020524?text=${v.id}@history \nTo see their reviews click \nhttps://wa.me/263713020524?text=${v.id}@reviews`;
-                    client.sendMessage(v.no, messageToSend).then((res) => {
-                        // console.log("Res " + JSON.stringify(res));
-                    }).catch(console.error);
-
-                }).catch((e) => {
-                    console.log(e);
-                    messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                    messageChain.delete(no);
-                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                        // console.log("Res " + JSON.stringify(res));
-                    }).catch(console.error);
-                });
-            } else if (query.substring(query.indexOf('@') + 1, query.length) === "reviews" && query.substring(0, query.indexOf('@')).length === 13) { // see proposal bidder reviews
-                messageChain.delete(no);
-                messages = [];
-                var id = query.substring(0, query.indexOf('@'));
-                mongoWorker.getWorkerReviews(id).then((v) => {
-                    messageToSend += `These are the last reviews from the last few gigz this person worked on\n\n`
-                    v.forEach((e) => {
-                        messageToSend += `${e.review} \n\n`;
-                    });
-                    messageToSend += `________________END_______________________`;
-                    client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                    }).catch(console.error);
-
-
-                }).catch((e) => {
-                    console.error(e);
-                    messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                    messageChain.delete(no);
-                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                        // console.log("Res " + JSON.stringify(res));
-                    }).catch(console.error);
-
-                });
-            } else if (query.substring(query.indexOf('@') + 1, query.length) === "history" && query.substring(0, query.indexOf('@')).length === 13) { // see worker history
-                messageChain.delete(no);
-                messages = [];
-                var id = query.substring(0, query.indexOf('@'));
-                mongoGig.getWorkerHistory(id).then((v) => {
-                    messageToSend += `These are the last gigz this person did\n\n`
-                    v.forEach((e) => {
-                        messageToSend += `Gig \n${e.details} \n\n`;
-                    });
-                    messageToSend += `________________END_______________________`;
-                    client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                    }).catch(console.error);
-
-
-                }).catch((e) => {
-                    console.error(e);
-                    messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                    messageChain.delete(no);
-                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                        // console.log("Res " + JSON.stringify(res));
-                    }).catch(console.error);
-                });
-            } else if (query.substring(query.indexOf('@') + 1, query.length) === "rate" && query.substring(0, query.indexOf('@')).length === 13) { // see proposal bidder reviews
-                messageChain.delete(no);
-                messages = [];
-                messages.push(query);
-                messageChain.set(no, messages);
-                messageToSend += `Thank you for rating the service you got, can you please type briefly what was your experience working with this person in carrying out the task`;
+                if (v === null) {
+                    messageToSend += `We do not appear to have this user in our database, please ask them again, and try again`;
+                } else {
+                    messages.push(query);
+                    messageChain.set(no, messages);
+                    messageToSend += `Thank you for rating the service you got, on a scale of 1 to 5, how would you rate the service you got, you can only type a number between 1 and 5`;
+                }
                 client.sendMessage(msg.from, messageToSend).then((res) => {
 
                 }).catch(console.error);
 
-            } else if (query.toLowerCase() === "add") {
-                messageChain.delete(no);
-                messages = [];
-                messages.push(query);
-                messageChain.set(no, messages);
-                messageToSend += `Can you type the full details of the property`;
-                client.sendMessage(msg.from, messageToSend).then((res) => {
+            }).catch(console.error);
 
-                }).catch(console.error);
+        } else {
 
-            } else if (query.substring(query.indexOf('@') + 1, query.length - 13) === "interested" && query.substring(0, query.indexOf('@')).length === 13 && query.substring(query.indexOf('d') + 1, query.length).length === 13) { // Send bid invite
-                messageChain.delete(no);
-                messages = [];
-                messages.push(query);
-                messageChain.set(no, messages);
-                return mongoGig.findGigByPosterId(no).then((res) => {
+            if (messageChain.has(no)) { // check if user is already in communication
+                messages = messageChain.get(no);
 
-                    if (res.length > 0) {
-                        res.forEach(el => {
-                            if (el.category.includes("Facilities and property services") && el.skills.toLowerCase().includes("accomodation") || el.skills.includes("accommodation") || el.skills.includes("real estate") || el.skills.toLowerCase().includes("agent") || el.skills.toLowerCase().includes("agents")) {
-                                let propertyId = query.substring(query.indexOf('d') + 1, query.length);
-                                let posterId = query.substring(0, query.indexOf('@'));
-
-                                return firebase.getRentalPropertyById(propertyId).then((querySnapshot) => {
-
-                                    if (querySnapshot.empty) {
-                                        messageToSend = "It appears the property is no longer available, you can check again later, or tomorrow";
-                                        client.sendMessage(no, messageToSend).then((res) => {
-
-                                        }).catch(console.error);
-                                    } else {
-
-                                        return mongoWorker.getWorkerById(posterId).then((v) => {
-
-                                            let propertyDesc = "";
-                                            querySnapshot.forEach((doc) => {
-
-                                                var info = doc.data();
-                                                propertyDesc = `${info.description} `;
-
-
-                                            });
-
-                                            if (v != null) {
-                                                //TODO Check if this person has a property gig, add to the text what they are offering, if there is no gig create one and send to this person??? then if this person says its available its a bid 
-                                                messageToSend = `I saw this property \n\n${propertyDesc.substring(0, propertyDesc.length - 115)} \n\nIs it still available? If it is available here is my offer, please *click the link*(link below) and type Property Available if it is still available  \n\n${el.details} \nYOU GET:${calculateMyCompensation(el.budget)}USD ${el.paymentStructure}  \n${getDaysDifference(el.finalDay)} left to bid\nTo Bid for this gig(IF AVAILABLE CLICK THIS LINK and type Property Available) click this link https://wa.me/263713020524?text=bid@${el.id}`;
-                                            } else {
-                                                messageToSend = `It appears we could not find the person who posted this property, please try again later, or file a report by typing #, then type hi, then after the welcome message type 6, to send us feedback`;
-
-                                            }
-                                            client.sendMessage(v[0].no, messageToSend).then((res) => {
-
-                                            }).catch(console.error);
-
-                                            let mess = "The person has been notified of your interest";
-                                            client.sendMessage(no, mess).then((res) => {
-
-                                            }).catch(console.error);
-
-                                        }).catch(console.error);
-
-
-                                    }
-
-                                }).catch(console.error);
-                            }
-
-                        });
-
-                    } else {
-                        messages = [];
-                        messageChain.delete(no);
-                        messageToSend = "It appears you are yet to create a gig, you need to create a gig before you can send a message of your interest to this person. \nTo find out about what a gig is, you can look at the option *5)How this works*, on the welcome message, to get here type hi after this message and type 5"
-                        client.sendMessage(no, messageToSend).then((res) => {
-
-                        }).catch(console.error);
-                    }
-
-                }).catch(console.error);
-            } else {
-
-                switch (messages.length) {
+                switch (messages.length) { // looking to get the context of the current conversation
                     case 1:
                         if (messages.length > 2) {
-                            messageToSend += "Our apology there was a network error, kindly try again, type # to restart";
+                            messageToSend = "Our apology there was a network error, kindly try again, type # to restart";
                             messageChain.delete(no);
+                            client.sendMessage(msg.from, messageToSend).then((res) => {
 
+                            }).catch(console.error);
                         } else {
-                            if (query === "2" || query === "4") {
-                                messages.push(query);
-                                messageChain.set(no, messages);
+                            if (messages[0] === "subscribe") {
 
-                                mongoWorker.getWorker(no).then((v) => {
-                                    if (v != null) {
-                                        clientMap.set(no, v);
-                                        if (clientMap.has(no) && query === "2") {
+                                if (query === "3") {
+                                    messageToSend = "Please send click this link https://wa.me/263719066282?text=Hi+Gigz+I+want+a+custom+software+solution+for+my+business";
 
-                                            var seenGigz = [];
-                                            mongoGig.getGigz(v.skills, v.category, 0).then((r) => {
-
-                                                if (r.length > 0) {
-                                                    messageToSend += "These are the gigz available right now\n\n";
-                                                    r.forEach((el) => {
-                                                        messageToSend += `${el.details} \nYOU GET:${calculateMyCompensation(el.budget)}USD ${el.paymentStructure}  \n${getDaysDifference(el.finalDay)} left to bid\nTo Bid for this gig click this link https://wa.me/263713020524?text=bid@${el.id} \n\n`;
-                                                        seenGigz.push(el);
-                                                    });
-                                                    seenGigzMap.set(no, seenGigz);
-                                                    messageToSend += "_________________END_________________\n";
-                                                    messageToSend += `Please select one of the option below \n1)To see the next batch of gigz type 1  \n\nType # to restart  \n\n${mainAd}`;
-                                                } else {
-                                                    messageToSend += `It appears there are no gigz that match your skills at the moment, please try again tomorrow, we will send you a message when something comes up \n${mainAd}`;
-                                                    messageChain.delete(no);
-                                                }
-
-                                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                                    // console.log("Res " + JSON.stringify(res));
-                                                }).catch(console.error);
-
-                                            }).catch(console.error);
-
-
-
-
-                                        } else {
-                                            if (query === "4") {
-                                                messageToSend += `Please answer the next few questions to update your account, you will only be asked once \nPlease tell us your name  \n\nIf this is not what you want type # to restart`;
-                                            } else {
-                                                messageToSend += `Please answer the next few questions, you will only be asked all these questions once \nPlease tell us your name  \n\nIf this is not what you want type # to restart`;
-                                            }
-
-                                            client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                                            }).catch((e) => {
-                                                console.error(e);
-                                                messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                                                messageChain.delete(no);
-                                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                                    // console.log("Res " + JSON.stringify(res));
-                                                }).catch(console.error);
-                                            });
-                                        }
-                                    } else {
-                                        if (query === "4") {
-                                            messageToSend += `Please answer the next few questions to update your account, you will only be asked once \nPlease tell us your full name \n\nIf this is not what you want type # to restart`;
-                                        } else {
-                                            messageToSend += `Please answer the next few questions, you will only be asked once \nPlease tell us your full name, \n\nIf this is not what you want type # to restart`;
-                                        }
-
-                                        client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                                        }).catch((e) => {
-                                            console.error(e);
-                                            messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                                            messageChain.delete(no);
-                                            client.sendMessage(msg.from, messageToSend).then((res) => {
-                                                // console.log("Res " + JSON.stringify(res));
-                                            }).catch(console.error);
-                                        });
-                                    }
-
-                                }).catch(console.error);
-
-
-
-
-                            } else if (query === "0") {
-                                addingReport(no, "What is Gigz?", "Looking at what is Gigz");
-                                messageToSend += "Gigz is a place for gigz, a gig is a task that a person pays for or gets paid to do,it can be as small as doing laundry and can even be as big as pegging a mine or even building a house,Gigz runs on Whatsapp as a chatbot meaning it has automated responses. \n\nOur goal is to give you *PEACE OF MIND*, by making it easy for you to work with *GENUINE* people, whether you are looking for an agent to help you find *ACCOMODATION*, or you need a *MECHANIC* , a *CARPENTER*, someone to *FIX YOUR PHONE*, a *DRIVER*, or any service you need, we make this happen by giving you the opportunity to post a gig(a task), and once you do, you will receive messages we call bids(Offers on how the service providers can help you), and you select the person to assign the task, based on the person's offer, profile, work history or reviews,\nTo see how this works, type hie, and after the welcome message type 5   \n\nOur second goal which is equaly important is give genuine hard working people opportunities to find gigz(tasks) and make money, but beyond that to build a *REPUTATION*, which will help them make more money in the future, or open doors for them in other avenues, you build a *REPUTATION* by getting reviews from tasks done, and your task history,\nWe all have various *Gifts and skills*, anyone can register your skills, whether you are in sales, in marketing, can fix cars, you are a letting agent, you are a chef, or a cook or a baker, or you drive a truck or a taxi,our dream is that you grow and make your dream come true  \nTo see how this works type hi, and after the welcome message, type 5  \n\nGet started with us, type start, and select any of the options on the welcome page";
-                                messageChain.delete(no);
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                    // console.log("Res " + JSON.stringify(res));
-                                }).catch(console.error);
-                            } else if (query === "8") {
-                                addingReport(no, "Rentail Property", "Looking for accommodation");
-                                messages.push(query);
-                                messageChain.set(no, messages);
-
-                                firebase.getRentalPropertyClientMatches().then((querySnapshot) => {
-
-
-
-                                    if (querySnapshot.empty) {
-                                        messageToSend += `We do not have any available properties at the moment, but if you set up a gig(task for someone to search for you, you will get messages when people have something that matches what you want) who has that property, \nType # to restart \n\n${mainAd}`;
-                                    } else {
-
-
-                                        messageToSend += "These are the properties we know of right now\n\n";
-                                        var properties = [];
-                                        querySnapshot.forEach((doc) => {
-
-                                            var info = doc.data();
-                                            messageToSend += `\n${info.description}\n\n`;
-                                            properties.push(info);
-
-                                        });
-                                        lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1];
-
-
-                                        myProperties.set(no, lastVisible);
-                                        messageToSend += "____________End_______________";
-                                        messageToSend += `\n*PlEASE type one the numbers below to select the next the option you want* e.g 2  \n1)Type 1 to see the next 7 properties \n#) Restart(type *#* to restart) \n\n\n${mainAd}`;
-
-                                    }
                                     client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                                    }).catch((err) => {
-                                        console.log("Error on sending properties => " + err)
-                                    });
+                                        messageChain.delete(no);
+                                    }).catch((console.error));
 
 
-                                }).catch((err) => {
-                                    console.log(err);
-                                    messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                                    messageChain.delete(no);
+                                } else {
+                                    messages.push(query);
+                                    messageChain.set(no, messages);
+                                    messageToSend = "Please send the Ecocash number you are using to pay, e.g 0771123123 our system works just like the system in the supermarket, after you put in your phone number it will send you a prompt to pay on your phone";
                                     client.sendMessage(msg.from, messageToSend).then((res) => {
                                         // console.log("Res " + JSON.stringify(res));
-                                    }).catch((err) => {
-                                        console.log("Error on second item => " + err)
-                                    });
-                                });
+                                    }).catch((console.error));
+                                }
+                            } else if (messages[0].substring(messages[0].indexOf("@"), messages[0].length).toLowerCase() === "@va" && messages[0].includes("@va")) {
 
+                                let v = clientMap.get(no);
+                                if (query === "1") { // About
+                                    let website = "";
+                                    if (v.package === "7.99") {
+                                        website = `${v.name}.gigz.co.zw`;
+                                    }
+                                    messageToSend = `Name: ${v.name} \nBrief Intro:${v.brief} \nServices: ${v.skills} \nAreas able to serve: ${v.areas} \nTo see their reviews click \nhttps://wa.me/263713020524?text=${v.name}@reviews \nTo chat to their virtual assistant click \nhttps://wa.me/263713020524?text=${v.name}@va   ${website} \n_Contact_: https://wa.me/${el.no.substring(0, el.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Gigz+I+am+interested+in+your+services`;
+                                } else if (query === "2") { // Services 
+                                    messages.push(query);
+                                    messageChain.set(no, messages);
+                                    let servicesPrices = v.prices.split(",");
+                                    messageToSend = `${name}'s Services and costs \n\n`;
+                                    for (let index = 0; index < servicesPrices.length; index++) {
+                                        const element = servicesPrices[index];
+                                        messageToSend += `${index + 1} ${element.substring(0, element.indexOf("="))}  ${element.substring(element.indexOf("=") + 1, element.length)}}\n\n`;
+                                    }
+                                    messageToSend += `____________END___________`;
+                                    messageToSend += `Select one of the options below  \n*1* Create a quotation \n*2* See work done before  \n*3* To see reviews \n_Contact_: https://wa.me/${el.no.substring(0, el.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Gigz+I+am+interested+in+your+services`;
+                                } else if (query === "3") { // FAQs
+                                    messages.push(query);
+                                    messageChain.set(no, messages);
+                                } else {
+                                    messageToSend = "This response is out of the expected one, please select one of the options 1 or 2 or 3 , if this is not what you type # to restart";
+                                }
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                    // console.log("Res " + JSON.stringify(res));
+                                }).catch((console.error));
+                            } else if (messages[0].substring(messages[0].indexOf('@') + 1, messages[0].length) === "rate" && messages[0].includes("@rate")) {
+                                if (parseInt(query) + 1 < 6 && parseInt(query) + 1 > 1) {
+                                    messageToSend = "It appears you have put in a number that is not between 1 and 5, please only enter a number between those numbers";
+                                } else {
+                                    messages.push(query);
+                                    messageChain.set(no, messages);
+                                    messageToSend = "Thank you sending in your rating, can you type briefly about your experience with this service";
+                                }
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                                }).catch((err) => {
+                                    console.log("Error on client welcome message => " + err)
+                                });
+                            } else if (messages[0].substring(messages[0].indexOf('@') + 1, messages[0].length) === "pic" && messages[0].substring(0, messages[0].indexOf('@')).length === 13) {
+                                //TODO Add file to firebase
+                                let imageUrl = "";
+                                let businessName = messages[0].substring(0, messages[0].indexOf('@'));
+
+                                mongoWorker.addPicture(no, imageUrl).then((r) => {
+                                    //TODO check is was added successfully
+                                    messageToSend = `Your display picture was added successfully, if you want to change it, you can do so by clicking https://263713020524?text=${businessName}@pic`;
+                                    messageChain.delete(no);
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                                    }).catch(console.error);
+                                }).catch(console.error);
+
+                            } else if (messages[0].substring(messages[0].indexOf('@') + 1, messages[0].length) === "portfolio" && messages[0].includes("@portfolio")) {
+                                if (attachmentData.data.length > 0) {
+                                    messageToSend = "Thank you for sending your picture, please type a bried description about the picture, here you could include what is in the picture, and/or the prices and/or the quality of work done, and how long it took you to have it done";
+                                } else {
+                                    messageToSend = "It appears you did not send a picture, please ensure that you send a picture, the best of what you have, because this helps you get clients, if this is not what you want to do you can type # to restart";
+                                }
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                                }).catch(console.error);
                             } else if (query === "1") {
                                 messages.push(query);
                                 messageChain.set(no, messages);
-                                messageToSend += "Can you type the details of the gig(task) you need to be done, PLEASE be detailed  ,\neg I need someone to fix my fridge, it is emperial one door has been working and suddenly went quiet I suspect a power short cucuit \nOR \nI need a truck to help move my good from Mabelreign to Malborough about 12km distance I have delicate furniture \nOR\n I need someone to look for accomodation for me in Kuwadzana my budget is 350, tiled,walled and gated preffered etc, \nOR\n I need some to make a website for my company, just 5 pages describing what we do, I will send you the company information in Harare";
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                messageToSend = "Please send the service you are looking for or the service providers occupation e.g  carpenter OR I need someone to help me find accommodation  \n\nTerms and Conditions Apply to see them send term or click this link https://263713020524?text=terms";
 
-                                }).catch(console.error);
-
-                            } else if (query === "3") {
-
-                                messages.push(query);
-                                messageChain.set(no, messages);
-                                messageToSend += "Please type the gig(task) you are looking for eg soccer OR accomodation  OR house keeping  OR farming  ";
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                                }).catch(console.error);
-                            } else if (query === "5") {
-                                messages.push(query);
-                                messageChain.set(no, messages);
-                                var messageToSend = "Please select one of the options below  \n1) Type 1 is you do not know what a gig is? \n2) Type 2 if you are looking for house to rent and you do not know what to do \n3) Type 3 if you are want to register but do not know what to do \n4) Type 4 if you want to post a gig and you do not know what to do \n5) Type 5 if you want a pdf that has frequently asked questions";
                                 client.sendMessage(msg.from, messageToSend).then((res) => {
                                     // console.log("Res " + JSON.stringify(res));
-                                }).catch(console.error);
+                                }).catch((console.error));
+                            } else if (query === "2") {
 
-                            } else if (query === "6") {
-                                addingReport(no, "Feedback", query);
-                                messages.push(query);
-                                messageChain.set(no, messages);
-                                messageToSend += "Thank you for sending us feedback, please type a detailed report of your experience and our team will attend to it promptly";
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                                }).catch(console.error);
-                            } else if (query === "7") {
-                                addingReport(no, "Terms and Conditions", "Looking at Terms and Conditions")
-                                var mediaMessage = "Gigz Terms and Conditions";
-                                const media = MessageMedia.fromFilePath('./t&cs.pdf');
-                                messageChain.delete(no);
-                                client.sendMessage(no, media, { caption: mediaMessage }).catch(console.error);
-
-
-                            } else if (query.toLowerCase() == "buy") {
-                                let payment = paynow.createPayment(invoice, "anelesiwawa@gmail.com");
-                                payment.add("Bids", 100);
-                                paynow.sendMobile(
-
-                                    // The payment to send to Paynow
-                                    payment,
-
-                                    // The phone number making payment 
-                                    query.toString(),
-
-                                    // The mobile money method to use. 
-                                    'ecocash'
-
-                                ).then((v) => {
-
-                                    if (v.success) {
-                                        pollUrl = v.pollUrl;
+                                paymentService.checkSubscriptionStatus(no).then((v) => {
+                                    if (v.expired || v === null) {
+                                        messageToSend = "It appears you are yet to subscribe, please type subscribe or click this link https://wa.me/263713020524?text=subscribe";
+                                    } else {
+                                        var clientArr = [v.package];
+                                        clientMap.set(no, clientArr);
                                         messages.push(query);
                                         messageChain.set(no, messages);
-                                        messageToSend += "After you set your PIN, type paid so we can confirm your payment or click https://wa.me/263713020524?text=paid   \n\nYou can Restart(type *#* to restart) ";
-                                    } else {
-                                        messageToSend += "It appears there was an error, please type your number again, to retry   \n\nYou can Restart(type *#* to restart) ";
+                                        messageToSend += `Please answer the next few questions, you will only be asked once, they help to market your services, so be honest and take them seriously \nPlease tell us your full name or the name of your business (this has to be unique, if it was already taken you will be asked again), \n\nIf this is not what you want type # to restart`;
                                     }
                                     client.sendMessage(msg.from, messageToSend).then((res) => {
                                         // console.log("Res " + JSON.stringify(res));
-                                    }).catch((err) => {
-                                        console.log("Error on report reporting => " + err)
-                                    });
-                                }).catch((e) => {
-                                    console.log(e);
-                                    messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                                    messageChain.delete(no);
-                                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                                        // console.log("Res " + JSON.stringify(res));
-                                    }).catch((err) => {
-                                        console.log("Error on second item => " + err)
-                                    });
+                                    }).catch((console.error));
+                                })
 
+                            } else if (query === "3") {
+                                messages.push("subscribe");
+                                messageChain.set(no, messages);
+                                messageToSend = "Please select the option you would like \n\n \n*1* What is Gigz? \n*2* Frequently Asked Questions \n*3* Terms and Conditions  \n\nTo choose any option send a number eng. 2 to get pay for a Profile, Virtual Assistant and a Web page ";
 
-                                });
-
-                            } else if (messages[0].substring(messages[0].indexOf('@') + 1, messages[0].length) === "rate" && messages[0].substring(0, messages[0].indexOf('@')).length == 13) {
-                                var id = messages[0].substring(0, messages[0].indexOf('@'));
-
-                                var review = new Review({
-                                    reviewer_no: no,
-                                    review: query,
-                                    date: new Date,
-                                    reviewed_person_id: id
-                                });
-
-                                mongoWorker.addReview(review).then((v) => {
-
-                                    if (v == null) {
-                                        messageToSend += "It looks like you have already reviewed this person, set up a new gig to give them again \n\n\n#) To restart type #";
-                                    } else {
-                                        messageToSend += "Review was successfully added, thank you, We hope you use our service again \n\n\n#) To restart type #";
-                                    }
-
-                                    client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                                    }).catch(console.error);
-
-
-                                });
-                            } else if (messages[0].substring(messages[0].indexOf('@') + 1, messages[0].length).length === 13 && messages[0].substring(0, messages[0].indexOf('@')) === "bid") {
-                                if (myGigsMap.has(no)) {
-
-                                    if (isValid(query) && validateEmail(query)) {
-                                        messageToSend += "It appears your bid contains some content that is not allowed, it may contain a phone number or email, these are not allowed, please try again without including these";
-                                        client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                                        }).catch(console.error);
-                                    } else {
-
-                                        var messageToSend = `New Bid Alert! \n${query} \n\nPLEASE REMEMBER TO RATE the person after the task is done save the link below to use later \n\nTo accept click this link and send it https://wa.me/263713020524?text=${clientMap.get(no).id}@accept${myGigsMap.get(no).id}@gig \n\nTo see this person's profile copy the link and send it https://wa.me/263713020524?text=${clientMap.get(no).id}@profile \n\nTo see this person's reviews copy link and send it https://wa.me/263713020524?text=${clientMap.get(no).id}@reviews `;
-                                        client.sendMessage(myGigsMap.get(no).no, messageToSend).then((res) => {
-                                            // console.log("Res " + JSON.stringify(res));
-                                            let message = `Your bid has been sent, you will get a response if your bid is accepted`;
-                                            client.sendMessage(no, message).then((res) => {
-                                                // console.log("Res " + JSON.stringify(res)); 
-                                                messageChain.delete(no);
-                                                mongoWorker.reduceWorkerBids(no).then((v) => { }).catch(console.error);
-
-                                            }).catch(console.error);
-
-
-                                        }).catch(console.error);
-                                    }
-
-                                } else {
-                                    messageToSend += `It appears this gig has is not available, please try again, or contact us by using the feedback option after the welcome message type # to restart`;
-                                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                                        messageChain.delete(no);
-                                    }).catch(console.error);
-                                }
-                            } else if (messages[0].substring(messages[0].indexOf('@') + 1, messages[0].length - 17) === "accept" && messages[0].substring(0, messages[0].indexOf('@')).length == 13) { // accept bid ){
-
-                                messageToSend += "This is not what you want? You can Restart(type *#* to restart) ";
                                 client.sendMessage(msg.from, messageToSend).then((res) => {
                                     // console.log("Res " + JSON.stringify(res));
-                                }).catch(console.error);
-
-                            } else if (messages[0].toLowerCase() === "add") {
-
-
-                                if (validateEmail(query) && isValid(query)) {
-                                    messageToSend += `Is appears you put in some information that is not allowed at this stage, DO NOT INCLUDE EMAILS OR PHONE NUMBER, there are already added as part of this`;
-                                    client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                                    }).catch(console.error);
-                                } else {
-                                    messageChain.delete(no);
-                                    messages = [];
-                                    let now = new Date();
-                                    let start = new Date(now.getFullYear(), 0, 0);
-                                    let diff = now - start;
-                                    let oneDay = 1000 * 60 * 60 * 24;
-                                    let day = Math.floor(diff / oneDay);
-                                    let milliSecondsSinceEpochPropID = new Date().valueOf().toString();
-
-
-
-                                    mongoWorker.getWorker(no).then((v) => {
-
-                                        if (v != null) {
-                                            let property = query;
-                                            property += `\nIf you are interested in this click this link https://wa.me/263713020524?text=${v.id}@interested${milliSecondsSinceEpochPropID}`;
-                                            firebase.addRentalProperty(day, "Harare", property, no, milliSecondsSinceEpochPropID).then((r) => {
-                                                messageToSend = `Your property has been added, and will be posted after it is approved!`;
-                                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                                    let mess = `${no} added ${query}`;
-                                                    client.sendMessage(ourContact, mess).then((res) => {
-
-                                                    }).catch(console.error);
-                                                }).catch(console.error);
-                                            }).catch(console.error);
-
-
-                                        } else {
-
-                                            let milliSecondsSinceEpoch = new Date().valueOf().toString();
-
-                                            let worker = new Worker({
-                                                name: "New User",
-                                                category: "Facilities and property services",
-                                                skills: "Real estate accommodation",
-                                                brief: "Not updated yet",
-                                                areas: "Harare",
-                                                no: no,
-                                                bids: 100,
-                                                date: new Date(),
-                                                id: milliSecondsSinceEpoch
-                                            });
-
-                                            mongoWorker.saveWorker(worker).then((v) => {
-                                                let property = query;
-                                                property += `\nIf you are interested in this click this link https://wa.me/263713020524?text=${v.id}@interested${milliSecondsSinceEpochPropID}`;
-                                                firebase.addRentalProperty(day, "Harare", property, no, milliSecondsSinceEpochPropID).then((r) => {
-                                                    messageToSend = `Your property has been added, and will be posted after it is approved!`;
-                                                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                                                        let mess = `${no} added ${query}`;
-                                                        client.sendMessage(ourContact, mess).then((res) => {
-
-                                                        }).catch(console.error);
-
-                                                    }).catch(console.error);
-                                                }).catch(console.error);
-
-
-                                            }).catch((e) => {
-                                                console.error(e);
-                                                messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                                                messages = [];
-                                                messageChain.delete(no);
-                                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                                    // console.log("Res " + JSON.stringify(res));
-                                                }).catch(console.error);
-
-                                            });
-
-
-                                        }
-
-                                    }).catch(console.error);
-
-
-                                }
-
-
-
-
+                                }).catch((console.error));
                             } else {
-
-                                messageToSend += "Please select one of the options above, by typing the number of the option you want, 1 or 2 or 3 or 4, \n\n\n#) To restart type #";
-
+                                messageToSend = "This response is out of the expected one, this chat has been restarted, send hi to choose the option you want";
+                                messageChain.delete(no);
                                 client.sendMessage(msg.from, messageToSend).then((res) => {
                                     // console.log("Res " + JSON.stringify(res));
-                                }).catch((err) => {
-                                    console.log("Error on second item => " + err)
-                                });
+                                }).catch((console.error));
                             }
-
-
                         }
+
+
                         break;
                     case 2:
-
                         if (messages.length > 3) {
-                            messageToSend += "Our apology there was a network error, kindly try again";
+                            messageToSend = "Our apology there was a network error, kindly try again";
                             messageChain.delete(no);
                             client.sendMessage(msg.from, messageToSend).then((res) => {
 
-                            }).catch((err) => {
-                                console.log("Error on client welcome message => " + err)
-                            });
+                            }).catch(console.error);
+
                         } else {
+                            if (messages[1] === "1") {
 
-                            if (messages[1] === "8") {
+                                var seenProfiles = [];
+                                mongoWorker.getWorkers(query, 0).then((r) => {
 
-                                if (query == "1") {
-
-                                    if (myProperties.has(no)) {
-
-                                        firebase.getRentalNextPropertyClientMatches(myProperties.get(no)).then((querySnapshot) => {
-
-                                            if (querySnapshot.empty) {
-                                                messageToSend += `We do not have any available properties at the moment, but if you set up a gig(task for someone to look for accommodation on your behalf) you will get messages when a property that likely matches what you want and Gigz will link you up with the person(agent/landlord/other third party) who has that property, \nType # to restart \n\n${mainAd}`;
-                                            } else {
-                                                var properties = [];
-                                                messageToSend += "These are the properties we know of right now\n\n";
-
-                                                querySnapshot.forEach((doc) => {
-
-                                                    var info = doc.data();
-                                                    messageToSend += `\n${info.description} \n\n`;
-                                                    properties.push(info);
-
-
-                                                });
-                                                myProperties.delete(no);
-                                                lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1];
-                                                myProperties.set(no, lastVisible);
-                                                messageToSend += "____________End_______________";
-                                                messageToSend += `\n*PlEASE type one the numbers below to select the next the option you want* e.g 2  \n1)Type 1 to see the next 7 properties \n#) Restart(type *#* to restart) \n\n${mainAd} `;
-
-                                            }
-                                            client.sendMessage(msg.from, messageToSend).then((res) => {
-                                                // console.log("Res " + JSON.stringify(res));
-                                            }).catch((err) => {
-                                                console.log("Error on second item => " + err)
-                                            });
-
-
-                                        }).catch((err) => {
-                                            console.log(e);
-                                            messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                                            messageChain.delete(no);
-                                            client.sendMessage(msg.from, messageToSend).then((res) => {
-                                                // console.log("Res " + JSON.stringify(res));
-                                            }).catch((err) => {
-                                                console.log("Error on second item => " + err)
-                                            });
+                                    if (r.length > 0) {
+                                        messageToSend += "Available service providers right now\n\n";
+                                        r.forEach((el) => {
+                                            messageToSend += `Name: *${el.name}* \nServices: *${el.skills}* \n_See Profile_:  https://wa.me/263713020524?text=${el.id}@profile \n_Contact_: https://wa.me/${el.no.substring(0, el.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Gigz+I+am+interested+in+your+services \n\n`;
+                                            seenProfiles.push(el);
                                         });
+                                        seenProfilesMap.set(no, seenProfiles);
+                                        messageToSend += "_________________END_________________\n";
+                                        messageToSend += `Please select one of the option below \n1)To see the next services providers \n\nType # to restart  \n\n${mainAd}`;
                                     } else {
+                                        messageToSend += `It appears there are no service providers that match your search at the moment, please try again tomorrow, or try searching using another term we have over 100 service providers already registered`;
+                                        messageChain.delete(no);
+                                    }
+
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+                                        // console.log("Res " + JSON.stringify(res));
+                                    }).catch(console.error);
+
+                                }).catch(console.error);
+
+
+
+
+                            } else if (messages[1] == "2") {
+                                mongoWorker.checkName(query).then((v) => {
+
+                                    if (v === null) {
+                                        messages.push(query);
+                                        messageChain.set(no, messages);
+                                        messageToSend += `Please select the category of your services by typing the number of the category e.g 3,or clicking the link below it \n\n1)Administration, business and management\nhttps://wa.me/263713020524?text=1 \n\n2)Animals, land and environment\nhttps://wa.me/263713020524?text=2 \n\n3)Architecture\nhttps://wa.me/263713020524?text=3 \n\n4)Computing and ICT\nhttps://wa.me/263713020524?text=4 \n\n5)Construction and building\nhttps://wa.me/263713020524?text=5 \n\n6)Design, arts and crafts\nhttps://wa.me/263713020524?text=6 \n\n7)Education and training\nhttps://wa.me/263713020524?text=7 \n\n8)Energy production services\nhttps://wa.me/263713020524?text=8 \n\n9)Engineering\nhttps://wa.me/263713020524?text=9  \n\n10)Facilities and property services\nhttps://wa.me/263713020524?text=10 \n\n11)Farming, Fishing, and Forestry\nttps://wa.me/263713020524?text=11 \n\n12)Financial services\nhttps://wa.me/263713020524?text=12 \n\n13)Garage services\nhttps://wa.me/263713020524?text=13  \n\n14)Hairdressing and beauty https://wa.me/263713020524?text=14 \n\n15)Healthcare\nhttps://wa.me/263713020524?text=15  \n\n16)Heritage, culture and libraries\nhttps://wa.me/263713020524?text=16  \n\n17)Hospitality, catering and tourism \nhttps://wa.me/263713020524?text=17 \n\n18)Languages \nhttps://wa.me/263713020524?text=18 \n\n19)Legal and court services\nhttps://wa.me/263713020524?text=19 \n\n20)Manufacturing and production\nhttps://wa.me/263713020524?text=20 \n\n21)Mining and extraction services\nhttps://wa.me/263713020524?text=21  \n\n22)Performing arts and media \nhttps://wa.me/263713020524?text=22   \n\n23)Print and publishing, marketing and advertising \nhttps://wa.me/263713020524?text=23  \n\n24)Retail and customer services\nhttps://wa.me/263713020524?text=24  \n\n25)Science, mathematics and statistics \nhttps://wa.me/263713020524?text=25 \n\n26)Security, uniformed and protective services \nhttps://wa.me/263713020524?text=26 \n\n27)Social sciences and religion\nhttps://wa.me/263713020524?text=27 \n\n28)Social work and caring services\nhttps://wa.me/263713020524?text=28 \n\n29)Sport and leisure \nhttps://wa.me/263713020524?text=29 \n\n30)Transport, distribution and logistics\nhttps://wa.me/263713020524?text=30  \n\n#) Restart(type # to restart)`;
+                                        client.sendMessage(msg.from, messageToSend).then((res) => {
+                                            // console.log("Res " + JSON.stringify(res));
+                                        }).catch(console.error);
+                                    } else {
+                                        messageToSend = "This name is already taken please try another name or structure it differently"
+                                    }
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+                                        // console.log("Res " + JSON.stringify(res));
+                                    }).catch((console.error));
+
+                                });
+                            } else if (messages[1] == "3") {
+                                if (query === "1") {
+                                    messageToSend = "Gigz is a platform for service providers, it helps them market their services and gives them tools to improve their servive, while at the same time helping people who are searching for services get them conviniently, excellenctly and reliably";
+                                } else if (query === "2") {
+                                    messages.push(query);
+                                    messageChain.set(no, messages);
+                                    messageToSend = "Please send the number of the option you want \n\n*1* I am looking for a service what do I do? \n*2* How do I register as a service provider? \n*3* What is a Virtual Assistant?  \n*4* What is a Web Page?   \n*5* Send a question";
+                                } else if (query === "3") {
+                                    messageToSend = "Terms and Conditions as at 1 April 2022 \n\n";
+                                } else {
+                                    messageToSend = "You were looking at FAQs, but sent something outside the options, so the chat has restarted, you can type hi now";
+                                    messageChain.delete(no);
+                                }
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                    // console.log("Res " + JSON.stringify(res));
+                                }).catch((console.error));
+
+                            } else if (messages[0] === "subscribe") {
+
+                                if (isValidPhoneNumber(query)) {
+                                    //Initiating paynow
+
+                                    const paynow = new Paynow("4114", "857211e6-052f-4a8a-bb42-5e0d0d9e38e7");
+                                    let payment = paynow.createPayment(invoice, "anelesiwawa@gmail.com");
+
+                                    let package = 0;
+                                    if (messages[1] = 1) {
+                                        package = 5.99;
+                                    } else {
+                                        package = 7.99;
+                                    }
+                                    let amount = 1;//zwlPrice * package;
+                                    payment.add("Subscription", amount);
+                                    paynow.sendMobile(
+
+                                        // The payment to send to Paynow
+                                        payment,
+
+                                        // The phone number making payment 
+                                        query.toString(),
+
+                                        // The mobile money method to use. 
+                                        'ecocash'
+
+                                    ).then((v) => {
+
+                                        if (v.success) {
+                                            messages.push(query);
+                                            messageChain.set(no, messages);
+                                            pollUrl = v.pollUrl;
+                                            messageToSend += "After you set your PIN, type paid so we can confirm your payment or click https://wa.me/263713020524?text=paid   \n\nYou can Restart(type *#* to restart) ";
+
+                                        } else {
+                                            messageToSend += "It appears there was an error, please type your number again, to retry   \n\nYou can Restart(type *#* to restart) ";
+                                        }
+                                        client.sendMessage(msg.from, messageToSend).then((res) => {
+                                            // console.log("Res " + JSON.stringify(res));
+                                        }).catch(console.error);
+                                    }).catch((e) => {
+                                        console.log(e);
                                         messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
                                         messageChain.delete(no);
                                         client.sendMessage(msg.from, messageToSend).then((res) => {
                                             // console.log("Res " + JSON.stringify(res));
-                                        }).catch((err) => {
-                                            console.log("Error on second item => " + err)
-                                        });
-                                    }
-                                } else {
-                                    messageToSend += "Looks like you typed something else, did you mean to see the next 7 properties, type 1, or you need to restart, type # to restart \n\nType # to restart";
-                                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                                        // console.log("Res " + JSON.stringify(res));
-                                    }).catch((err) => {
-                                        console.log("Error on posting a house => " + err)
+                                        }).catch(console.error);
+
+
                                     });
-                                }
 
-
-                            } else if (messages[1] === "1") {
-
-                                if (validateEmail(query) || isValid(query)) {
-                                    messageToSend += "It appears your details contains contacts or some other content that is not allowed, please ensure to add only details about the work you need done \n\nRestart(type *#* to restart) ";
-                                    client.sendMessage(no, messageToSend).then((res) => {
-                                        // console.log("Res " + JSON.stringify(res));
-                                    }).catch(console.error);
                                 } else {
-                                    messages.push(query);
-                                    messageChain.set(no, messages);
-                                    messageToSend += "Can you type you budget for this gig in USD(How much you will pay the person who will do the gig(perfom the task)), only a number is allowed e.g 50 , If this is not what you want type # to restart";
+                                    messageToSend = "It appears you did not enter a valid phone number, please check the number and send again";
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+                                        // console.log("Res " + JSON.stringify(res));
+                                    }).catch((console.error));
+                                }
+                            } else if (messages[0].substring(messages[0].indexOf('@') + 1, messages[0].length) === "rate" && messages[0].includes("@rate")) {
+
+                                let businessName = messages[0].substring(0, messages[0].indexOf('@'));
+                                let newReview = new reviewsModel({
+                                    review: query,
+                                    name: businessName,
+                                    stars: messages[2],
+                                    reviewer_no: no,
+                                });
+
+                                mongoWorker.addReview(newReview).then((r) => {
+
+                                    if (r === null) {
+                                        messageToSend = "It seems you already rated this service provider, we only allow you to rate a service provider once";
+                                    } else {
+                                        messageToSend = "Thank you for leaving a review of the service you got, this will help someone else when they are interested in working with this person";
+                                    }
                                     client.sendMessage(msg.from, messageToSend).then((res) => {
                                         // console.log("Res " + JSON.stringify(res));
                                     }).catch(console.error);
-                                }
 
-                            } else if (messages[1] == "6") {
-                                messageToSend += "Thank you for sending feedback our team will be in touch with you *promptly*";
-
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                    // console.log("Res " + JSON.stringify(res));
+                                }).catch(console.error);
+                            } else if (messages[0].substring(messages[0].indexOf('@') + 1, messages[0].length) === "portfolio" && messages[0].includes("@portfolio")) {
+                                //TODO Add file to firebase
+                                let imageUrl = "";
+                                let businessName = messages[0].substring(0, messages[0].indexOf('@'));
+                                let portfolio = new portfolioModel({
+                                    name: businessName,
+                                    no: no,
+                                    imageUrl: imageUrl,
+                                    description: query,
+                                    date: new Date(),
+                                })
+                                mongoWorker.addPortfolio(portfolio).then((r) => {
+                                    //TODO check is was added successfully
+                                    messageToSend = `Your image was added to your portfolio successfully, you can add more, we encourage you to do so, by clicking https://263713020524?text=${businessName}@portfolio`;
                                     messageChain.delete(no);
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
 
-
+                                    }).catch(console.error);
                                 }).catch(console.error);
+                            } else if (messages[0].substring(messages[0].indexOf("@"), messages[0].length).toLowerCase() === "@va" && messages[0].includes("@va")) {
 
-                                var mess = `${name} whose number is ${no} just added a report ${query}`;
-                                client.sendMessage(ourContact, mess).then((res) => {
-
-                                }).catch(console.error);
-
-                            } else if (messages[1] === "2" || messages[1] === "4") {
-
-                                if (clientMap.has(no) && messages[1] === "2") {
+                                if (messages[1] === "2") {
 
                                     if (query === "1") {
-
-                                        // get the next batch of gigz 
-                                        var seenGigz = seenGigzMap.get(no);
-                                        mongoGig.getGigz(clientMap.get(no).skills, clientMap.get(no).category, seenGigz.length).then((v) => {
-
-                                            if (v.length > 0) {
-                                                messageToSend += "These are the next batch of gigz available right now\n\n";
-                                                v.forEach((el) => {
-                                                    messageToSend += `${el.details} \nYOU GET:${calculateMyCompensation(el.budget)}USD ${el.paymentStructure}  \n${getDaysDifference(el.finalDay)} left to bid \nTo Bid for this gig click this link https://wa.me/263713020524?text=bid@${el.id} \n\n`;
-                                                    seenGigz.push(el);
-                                                });
-                                                seenGigzMap.set(no, seenGigz);
-                                                messageToSend += "___________________END_________________________\n";
-                                                messageToSend += "Please select one of the option below \n1)To see the next batch of gigz type 1  \n\nType # to restart ";
-                                            } else {
-                                                messageToSend += `It appears there are no more gigz that match your skills at the moment, please try again tomorrow, we will send you a message when something comes up \n${mainAd}`;
-                                                messageChain.delete(no);
-                                            }
-                                            client.sendMessage(msg.from, messageToSend).then((res) => {
-                                                // console.log("Res " + JSON.stringify(res));
-                                            }).catch(console.error);
-
-                                        }).catch(console.error);
-
-                                    } else {
-                                        messageToSend += `This response is outside of the ones expected, please click on the link of the gig of you choice, or type 1 to see next batch of gigz, or type # to restart`;
-                                        client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                                        }).catch(console.error);
-
-                                    }
-
-                                } else {
-
-                                    if (isValid(query) || validateEmail(query)) {
-                                        messageToSend = "It appears your response contains invalid material, ensure you do not add your contacts to these responses, Please type your name";
-                                        client.sendMessage(msg.from, messageToSend).then((res) => {
-                                            // console.log("Res " + JSON.stringify(res));
-                                        }).catch(console.error);
-                                    } else {
                                         messages.push(query);
                                         messageChain.set(no, messages);
-                                        messageToSend += `Please select the category of your occupation by typing the number of the category e.g 3,or clicking the link below it \n\n1)Administration, business and management\nhttps://wa.me/263713020524?text=1 \n\n2)Animals, land and environment\nhttps://wa.me/263713020524?text=2 \n\n3)Architecture\nhttps://wa.me/263713020524?text=3 \n\n4)Computing and ICT\nhttps://wa.me/263713020524?text=4 \n\n5)Construction and building\nhttps://wa.me/263713020524?text=5 \n\n6)Design, arts and crafts\nhttps://wa.me/263713020524?text=6 \n\n7)Education and training\nhttps://wa.me/263713020524?text=7 \n\n8)Energy production services\nhttps://wa.me/263713020524?text=8 \n\n9)Engineering\nhttps://wa.me/263713020524?text=9  \n\n10)Facilities and property services\nhttps://wa.me/263713020524?text=10 \n\n11)Farming, Fishing, and Forestry\nttps://wa.me/263713020524?text=11 \n\n12)Financial services\nhttps://wa.me/263713020524?text=12 \n\n13)Garage services\nhttps://wa.me/263713020524?text=13  \n\n14)Hairdressing and beauty https://wa.me/263713020524?text=14 \n\n15)Healthcare\nhttps://wa.me/263713020524?text=15  \n\n16)Heritage, culture and libraries\nhttps://wa.me/263713020524?text=16  \n\n17)Hospitality, catering and tourism \nhttps://wa.me/263713020524?text=17 \n\n18)Languages \nhttps://wa.me/263713020524?text=18 \n\n19)Legal and court services\nhttps://wa.me/263713020524?text=19 \n\n20)Manufacturing and production\nhttps://wa.me/263713020524?text=20 \n\n21)Mining and extraction services\nhttps://wa.me/263713020524?text=21  \n\n22)Performing arts and media \nhttps://wa.me/263713020524?text=22   \n\n23)Print and publishing, marketing and advertising \nhttps://wa.me/263713020524?text=23  \n\n24)Retail and customer services\nhttps://wa.me/263713020524?text=24  \n\n25)Science, mathematics and statistics \nhttps://wa.me/263713020524?text=25 \n\n26)Security, uniformed and protective services \nhttps://wa.me/263713020524?text=26 \n\n27)Social sciences and religion\nhttps://wa.me/263713020524?text=27 \n\n28)Social work and caring services\nhttps://wa.me/263713020524?text=28 \n\n29)Sport and leisure \nhttps://wa.me/263713020524?text=29 \n\n30)Transport, distribution and logistics\nhttps://wa.me/263713020524?text=30  \n\n#) Restart(type # to restart)`;
-                                        client.sendMessage(msg.from, messageToSend).then((res) => {
-                                            // console.log("Res " + JSON.stringify(res));
-                                        }).catch(console.error);
-                                    }
-
-
-                                }
-
-                            } else if (messages[1] === "3") {
-                                addingReport(no, "Searching", query);
-                                messages.push(query);
-                                messageChain.set(no, messages);
-                                var seenGigz = [];
-                                mongoGig.searchGigz(query, 0).then((v) => {
-
-                                    if (v.length > 0) {
-                                        messageToSend += "These are the gigz available right now\n\n";
-                                        v.forEach((el) => {
-                                            messageToSend += `${el.details} \nYOU GET:${calculateMyCompensation(el.budget)}USD ${el.paymentStructure} \n${getDaysDifference(el.finalDay)} left to bid \nTo Bid for this gig click this link https://wa.me/263713020524?text=bid@${el.id} \n\n`;
-                                            seenGigz.push(el);
-                                        });
-                                        seenGigzMap.set(no, seenGigz);
-                                        messageToSend += "___________________END_________________________\n";
-                                        messageToSend += "Please select one of the option below \n1)To see the next batch of gigz type 1  \n\nType # to restart ";
+                                        let servicesPrices = v.prices.split(",");
+                                        messageToSend = `${name}'s Services and costs \n\n`;
+                                        for (let index = 0; index < servicesPrices.length; index++) {
+                                            const element = servicesPrices[index];
+                                            messageToSend += `${index + 1} ${element.substring(0, element.indexOf("="))}  ${element.substring(element.indexOf("=") + 1, element.length)}}\n\n`;
+                                        }
+                                        messageToSend += `____________END___________`;
+                                        messageToSend += `Type the number of each of the services you want separated by a comma  and send e.g 1,2,3  for services 1 and 2 and 3 \nOR \n2,4,6 for services 2 and 4 and 6 `;
                                     } else {
-                                        messageToSend += "It appears we do not have gigz that match what you are looking for right now, you can search for other kind of gigz by reselecting option 3, or you can try again later";
-                                        messageChain.delete(no);
+
                                     }
-                                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                                        // console.log("Res " + JSON.stringify(res));
-                                    }).catch(console.error);
-
-                                }).catch(console.error);
-
-
-                            } else if (messages[1].toLowerCase() === "buy") {
-                                if (query.toLowerCase() === "paid") {
-                                    let status = await axios.get(pollUrl);
-                                    if (status.data.includes("status=Paid") || status.data.includes("status=Awaiting Delivery") || status.data.includes("status=Delivered")) {
-                                        mongoWorker.addWorkerBids(no).then((v) => {
-                                            messageToSend += "Your payment was successful, we have added 5 bids to your account \n\nRestart(type *#* to restart) ";
-                                            client.sendMessage(msg.from, messageToSend).then((res) => {
-                                                // console.log("Res " + JSON.stringify(res));
-                                            }).catch((err) => {
-                                                console.log("Error on report reporting => " + err)
-                                            });
-                                        }).catch((e) => {
-                                            console.log(e);
-                                            messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                                            messageChain.delete(no);
-                                            client.sendMessage(msg.from, messageToSend).then((res) => {
-                                                // console.log("Res " + JSON.stringify(res));
-                                            }).catch((err) => {
-                                                console.log("Error on second item => " + err)
-                                            });
-                                        });
-                                    } else if (status.data.includes("status=Sent")) {
-                                        messageToSend += "It is taking a bit more time to confirm your payment, please wait 2 minutes and type paid again \n\nRestart(type *#* to restart) ";
-                                        client.sendMessage(no, messageToSend).then((res) => {
-                                            // console.error("Res " + JSON.stringify(res));
-                                        }).catch(console.error);
-
-                                    } else {
-                                        messageToSend += "It appears your payment was not successful,kindly contact the team if you paid, so we can credit your account,to contact us, type # and after the welcome message, type 3, to send a report \nYou can Restart(type *#* to restart) ";
-                                        client.sendMessage(msg.from, messageToSend).then((res) => {
-                                            // console.log("Res " + JSON.stringify(res));
-                                        }).catch((err) => {
-                                            console.log("Error on report reporting => " + err)
-                                        });
-                                    }
-
-
 
                                 } else {
-                                    messageToSend += "This is not what you want? You can Restart(type *#* to restart) ";
+                                    messageToSend = `It appears you did not select one of the available options, please select option 1 or 2 or 3`;
                                     client.sendMessage(msg.from, messageToSend).then((res) => {
-                                        // console.log("Res " + JSON.stringify(res));
-                                    }).catch((err) => {
-                                        console.log("Error on report reporting => " + err)
-                                    });
 
+                                    }).catch(console.error);
                                 }
-                            } else if (messages[1] === "5") {
-                                addingReport(no, "How it works", query);
-                                messageChain.delete(no);
-                                if (query === "1") {
-                                    var messageToSend = "A gig is a task that you assign someone and pay them for it or get paid for doing it, when you want to post a gig, you decide the amount that you will pay the person for the gig";
-                                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                                        // console.log("Res " + JSON.stringify(res));
-                                    }).catch(console.error);
-                                } else if (query === "2") {
-                                    var messageToSend = "Gigz help you get accomodation through posting a gig, posting a gig is FREE \nA gig is like asking someone to look/search for accomodation for you, and you pay them after they get you a property, you are the one who decides what's the best amount you would want to give to the person who helps you.So you post the gig on the Whatsapp system.We have people who are registered who can help you, so when they see your gig, they send you a message of what they have and you decide to accept that house/room or not, and select the one you like, and after you choose the person who will help you, you also get a chance to come back and write a review about them, you also are encouraged to sign an affidavit with the person so you have better protection from being scammed \nThe option to post a gig is option 1 on the welcome message, so to post a gig, type hi, then type 1 and answer the few questions that follow  ";
-                                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                                        // console.log("Res " + JSON.stringify(res));
-                                    }).catch(console.error);
-                                } else if (query === "3") {
-                                    var messageToSend = "To become part of our database of our you have to register, to register, you have to type option 2 on the welcome message, to do that from here, type hi, and type 2 , and answer the questions that follow, you will be asked what is your name, and to select the category of your occupation , then you will be asked your skills ,and about yourself and then the areas you like to work in, that is all ";
-                                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                                        // console.log("Res " + JSON.stringify(res));
-                                    }).catch(console.error);
-                                } else if (query === "4") {
-                                    var messageToSend = "Posting a gig means posting a task, posting a Gig is FREE, a task can be as simple as someone doing your laundry or as complicated as someone building your house, and it allows you to task with genuine people, who you are review after the work is done, to post a gig, type hi, then type 1 and answer the few questions that follow, you will be asked what you need to get done, and your budget for the gig and the last day for people to send you messages ";
-                                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                                        // console.log("Res " + JSON.stringify(res));
-                                    }).catch(console.error);
-                                } else if (query === "5") {
-                                    var mediaMessage = "Take advantage of the Gigs today #Believe";
-                                    const media = MessageMedia.fromFilePath('./FAQs.pdf');
-                                    client.sendMessage(no, media, { caption: mediaMessage }).catch(console.error);
-
-                                } else {
-                                    const media = MessageMedia.fromFilePath('./FAQs.pdf');
-                                    client.sendMessage(no, media, { caption: mediaMessage }).catch(console.error);
-                                }
-                            } else if (messages[0].substring(messages[0].indexOf('@') + 1, messages[0].length - 17) === "accept" && messages[0].substring(0, messages[0].indexOf('@')).length === 13) { // accept bid ){
-                                messageToSend += "This is not what you want? You can Restart(type *#* to restart) ";
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                    // console.log("Res " + JSON.stringify(res));
-                                }).catch(console.error);
-
-
                             } else {
-
-                                messageToSend += "There was an error, please type # to restart";
+                                messageToSend = "This response is out of the expected one, this chat has been restarted, send hi to choose the option you want";
+                                messageChain.delete(no);
                                 client.sendMessage(msg.from, messageToSend).then((res) => {
                                     // console.log("Res " + JSON.stringify(res));
                                 }).catch(console.error);
                             }
-
                         }
+
 
                         break;
                     case 3:
-                        if (messages[1] === "2" || messages[1] === "4") {
-
-                            if (isValid(query) || validateEmail(query)) {
-                                messageToSend = "It appears your response contains invalid material, ensure you do not add your contacts to these responses"
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                    // console.log("Res " + JSON.stringify(res));
-                                }).catch(console.error);
-                            } else {
-                                messages.push(query);
-                                messageChain.set(no, messages);
-                                messageToSend += "Please type your skills, separate each skill by a comma, type ALL your skills that you believe you can earn from, e.g cooking, dancing, web development,decor, grooming and etiquitte, \n\nIf this is not what you want type # to restart ";
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                    // console.log("Res " + JSON.stringify(res));
-                                }).catch(console.error);
-                            }
-
-
-                        } else if (messages[1] === "3") {
+                        if (messages[1] === "1") {
                             if (query === "1") {
-                                var seenGigz = seenGigzMap.get(no);
-                                mongoGig.searchGigz(messages[2], seenGigz.length).then((v) => {
-                                    if (v.length > 0) {
-                                        messageToSend += "These are the gigz available right now\n\n";
-                                        v.forEach((el) => {
-                                            messageToSend += `${el.details} \nYOU GET:${calculateMyCompensation(el.budget)}USD ${el.paymentStructure} \n${getDaysDifference(el.finalDay)} left to bid \nTo Bid for this gig click this link https://wa.me/263713020524?text=bid@${el.id} \n\n`;
-                                            seenGigz.push(el);
+                                var seenProfiles = seenProfilesMap.get(no).length;
+                                mongoWorker.getWorkers(query, seenProfiles).then((r) => {
+
+                                    if (r.length > 0) {
+                                        messageToSend += "Available service providers right now\n\n";
+                                        r.forEach((el) => {
+                                            messageToSend += `Name: *${el.name}* \nServices: *${el.skills}* \n_See Profile_:  https://wa.me/263713020524?text=${el.id}@profile \n_Contact_: https://wa.me/${el.no.substring(0, el.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Gigz+I+am+interested+in+your+services \n\n`;
+                                            seenProfiles.push(el);
                                         });
-                                        seenGigzMap.set(no, seenGigz);
-                                        messageToSend += "___________________END_________________________\n";
-                                        messageToSend += "Please select one of the option below \n1)To see the next batch of gigz type 1  \n\nType # to restart";
+                                        seenProfilesMap.set(no, seenProfiles);
+                                        messageToSend += "_________________END_________________\n";
+                                        messageToSend += `Please select one of the option below \n1)To see the next services providers \n\nType # to restart `;
                                     } else {
-                                        messageToSend += "It appears we do not have anymore gigz you are searching for, you can change what you are searching for or check again tomorrow";
+                                        messageToSend += `It appears there are not any more service providers that match your search at the moment, please try again tomorrow, or try searching using another term we have over 100 service providers already registered`;
+                                        messageChain.delete(no);
                                     }
 
                                     client.sendMessage(msg.from, messageToSend).then((res) => {
                                         // console.log("Res " + JSON.stringify(res));
                                     }).catch(console.error);
-                                }).catch(console.error);
 
-                            } else {
-                                messageToSend += `This response is outside of the ones expected, please click on the link of the gig of you choice, or type 1 to see next batch of gigz, or type # to restart`;
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                                }).catch(console.error);
-                            }
-                        } else if (messages[1] === "1") {
-
-                            if (isNumeric(query)) {
-                                messages.push(query);
-                                messageChain.set(no, messages);
-                                messageToSend += "Can you type your intended payment structure e.g upfront , half down, balance on delivery, after work is done, on milestones";
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                    // console.log("Res " + JSON.stringify(res));
                                 }).catch(console.error);
                             } else {
-                                messageToSend += "Can you type you budget for this gig(task) in USD, only a number is allowed e.g 50 \n\nIf this is not what you want type # to restart";
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                    // console.log("Res " + JSON.stringify(res));
-                                }).catch(console.error);
+                                messageToSend = "This response is out of the expected one, this chat has been restarted, send hi to choose the option you want";
+                                messageChain.delete(no);
                             }
 
-                        } else {
-                            messageToSend += "This is not what you want? You can Restart(type *#* to restart) ";
-                            client.sendMessage(msg.from, messageToSend).then((res) => {
-                                // console.log("Res " + JSON.stringify(res));
-                            }).catch(console.error);
-                        }
-
-                        break;
-                    case 4:
-                        if (messages[1] === "2" || messages[1] === "4") {
-
-                            if (isValid(query) || validateEmail(query)) {
-                                messageToSend = "It appears your response contains invalid material, ensure you do not add your contacts to these responses, please enter your skills separate by a comma";
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                    // console.log("Res " + JSON.stringify(res));
-                                }).catch(console.error);
-                            } else {
-                                messages.push(query);
-                                messageChain.set(no, messages);
-                                messageToSend += "Type a brief intro about yourself, to help you stand out from everyone that may be interested in the same gig as you, you may want to include in this, your education history and work history, and what inspires you";
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                    // console.log("Res " + JSON.stringify(res));
-                                }).catch(console.error);
-
-                            }
-
-
-
-                        } else if (messages[1] === "1") {
+                        } else if (messages[1] == "2") {
                             messages.push(query);
                             messageChain.set(no, messages);
-                            messageToSend += "When is the final day for receiving bids(messages from people interested in this gig(task) the best time is normally *atleast* 7 days and for those looking for houses/rooms for rent we believe 14 days from today is recommended for best results), use this format MM-DD-YYYY e.g 12-25-2022 \n\nIf this is not what you want type # to restart";
+                            messageToSend += "Please type your services, separate each service by a comma,  e.g cooking, dancing, web development,decor, grooming and etiquitte, \n\nIf this is not what you want type # to restart ";
                             client.sendMessage(msg.from, messageToSend).then((res) => {
                                 // console.log("Res " + JSON.stringify(res));
                             }).catch(console.error);
 
+                        } else if (messages[1] == "3") {
+                            if (messages[2] === 2) {
+                                if (query === "1") {
+                                    messageToSend = "There are several ways to search for a service, you can go on our simple website gigz.co.zw and enter the service or service provider you are looking for and click enter, results will pop up *OR* you can service on this whatsapp system, to search from this point type # to restart, then type hi, and after the welcome message, then send 1 and after the question type the service or service provider you are looking for, \n\nIT IS FREE TO USE";
+                                } else if (query === "2") {
+                                    messageToSend = "To register you need to have subscribe, after you subscribe, on the welcome screen send 2, to register, and select one the options of the packages available now, and answer the questions that follow, please ensure you follow the formats mentioned for best results";
+                                } else if (query === "3") {
+                                    messageToSend = "A virtual assistant is a Whatsapp with automated responses sometimes refered to as Whatsapp Bot, Gigz is an example of such, when you create a profile you get to create one for your services, so clients can see your prices, see Frequently asked questions, and even get a quotation in pdf format, with a virtual assistant you can concentrate on your work, while it works for you";
+                                } else if (query === "4") {
+                                    messageToSend = "Gigz web page is a online site for your services, it would be found on [yourname].gigz.co.zw , and is really a website without the extra costs of a domain and hosting, and new ways of showing your website will be added weekly, ";
+                                } else {
+                                    messageToSend = "This response is out of the expected one, Please send one of the options indicated above 1 or 2 or 3 or 4";
+
+                                }
+
+                            } else {
+                                messageToSend = "This response is out of the expected one, this chat has been restarted, send hi to choose the option you want";
+                                messageChain.delete(no);
+                            }
+                            client.sendMessage(msg.from, messageToSend).then((res) => {
+                                // console.log("Res " + JSON.stringify(res));
+                            }).catch((console.error));
+
+                        } else if (messages[0] === "subscribe") {
+                            if (query.toLowerCase() === "paid") {
+                                let status = await axios.get(pollUrl);
+                                if (status.data.includes("status=Paid") || status.data.includes("status=Awaiting Delivery") || status.data.includes("status=Delivered")) {
+
+                                    let package = 0;
+                                    if (messages[1] = 1) {
+                                        package = 5.99;
+                                    } else {
+                                        package = 7.99;
+                                    }
+                                    let amount = zwlPrice * package;
+
+                                    let payment = new Payment({
+                                        package: package,
+                                        amount: amount,
+                                        numberUsedInPayment: messages[2],
+                                        no: no,
+                                        date: new Date(),
+                                        dayOfYear: dayOfYear(new Date()),
+                                        valid: true
+                                    })
+                                    paymentService.addPayment(payment).then((v) => {
+                                        messageToSend = "Your payment was successful valid for the next 30 days added to your account \n\nRestart(type *#* to restart) ";
+                                        client.sendMessage(msg.from, messageToSend).then((res) => {
+                                            // console.log("Res " + JSON.stringify(res));
+                                        }).catch(console.error);
+                                    }).catch((e) => {
+                                        console.log(e);
+                                        messageToSend = "Oooops looks like there was an error, please try again, by sending a new message ";
+                                        messageChain.delete(no);
+                                        client.sendMessage(msg.from, messageToSend).then((res) => {
+                                            // console.log("Res " + JSON.stringify(res));
+                                        }).catch(console.error);
+                                    });
+                                } else if (status.data.includes("status=Sent")) {
+                                    messageToSend += "It is taking a bit more time to confirm your payment, please wait 2 minutes and type paid again \n\nRestart(type *#* to restart) ";
+                                    client.sendMessage(no, messageToSend).then((res) => {
+                                        // console.error("Res " + JSON.stringify(res));
+                                    }).catch(console.error);
+
+                                } else {
+                                    messageToSend += "It appears your payment was not successful,kindly contact the team if you paid, so we can credit your account,to contact us, type # and after the welcome message, type 3, to send a report \nYou can Restart(type *#* to restart) ";
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+                                        // console.log("Res " + JSON.stringify(res));
+                                    }).catch(console.error);
+                                }
+                            } else {
+                                messageToSend = "It appears you sent something that is outside our understand, did you want to confirm payment, send paid or click this link https://wa.me/263713020524?text=paid, if this is not what you want type # to restart";
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                    // console.log("Res " + JSON.stringify(res));
+                                }).catch((console.error));
+                            }
+                        } else if (messages[0].substring(messages[0].indexOf("@"), messages[0].length).toLowerCase() === "@va" && messages[0].includes("@va")) {
+
+                            if (messages[1] === "1") {
+
+
+                                if (messages[2] === "1") {
+                                    messages.push(query);
+                                    messageChain.set(no, messages);
+                                    let servicesPrices = query.split(",");     // This is wrong
+                                    messageToSend = `Services you chose \n\n`; // Make allowance for more than one service
+                                    for (let index = 0; index < servicesPrices.length; index++) {
+                                        const element = servicesPrices[index];
+                                        messageToSend += `${index + 1} ${element.substring(0, element.indexOf("="))}  ${element.substring(element.indexOf("=") + 1, element.length)}}\n\n`;
+                                    }
+                                    messageToSend += `____________END___________`;
+                                    messageToSend += `Please confirm these are the services you wanted and send \n*1* Yes, these are the services I want *2* No, let me resend the services I want`;
+                                } else {
+
+                                }
+
+                            } else {
+                                messageToSend = `It appears you did not select one of the available options, please select option 1 or 2 or 3`;
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                                }).catch(console.error);
+                            }
                         } else {
-                            messageToSend += "This is not what you want? You can Restart(type *#* to restart) ";
+                            messageToSend = "This response is out of the expected one, this chat has been restarted, send hi to choose the option you want";
+                            messageChain.delete(no);
                             client.sendMessage(msg.from, messageToSend).then((res) => {
                                 // console.log("Res " + JSON.stringify(res));
                             }).catch(console.error);
                         }
+                        break;
+                    case 4:
+                        if (messages[1] == "2") {
+                            messages.push(query);
+                            messageChain.set(no, messages);
+                            messageToSend = "Type a brief intro about yourself or your business,you to include in this, your unique services, your service history ,why clients should choose you, and what inspires you";
+                        } else if (messages[0].substring(messages[0].indexOf("@"), messages[0].length).toLowerCase() === "@va" && messages[0].includes("@va")) {
+
+                            if (messages[1] === "1") {
+
+
+                                if (messages[2] === "1") {
+
+
+                                    if (query === "1") { // Yes these are the services I want
+                                        // Send pdf here
+
+                                    } else if (query === "2") {
+                                        messageChain.set(no, messages.pop());
+                                        let servicesPrices = query.split(",");
+                                        messageToSend = `Okay let us do this again \n\n`;
+                                        for (let index = 0; index < servicesPrices.length; index++) {
+                                            const element = servicesPrices[index];
+                                            messageToSend += `${index + 1} ${element.substring(0, element.indexOf("="))}  ${element.substring(element.indexOf("=") + 1, element.length)}}\n\n`;
+                                        }
+                                        messageToSend += `____________END___________`;
+                                        messageToSend += `Type the number of each of the services you want separated by a comma(if you want more than one of the same service, you can list it as many times as you want it)  and send e.g 1,2,3  for services 1 and 2 and 3 \nOR \n2,4,6 for services 2 and 4 and 6 `;
+                                    } else {
+                                        messageToSend = `It appears you did not select one of the available options, please select option 1 or 2 `;
+                                        client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                                        }).catch(console.error);
+                                    }
+
+                                } else {
+
+                                }
+
+                            } else {
+                                messageToSend = `It appears you did not select one of the available options, please select option 1 or 2 or 3`;
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                                }).catch(console.error);
+                            }
+
+                        } else {
+                            messageToSend = "This response is out of the expected one, this chat has been restarted, send hi to choose the option you want";
+                            messageChain.delete(no);
+                        }
+                        client.sendMessage(msg.from, messageToSend).then((res) => {
+                            // console.log("Res " + JSON.stringify(res));
+                        }).catch(console.error); s
                         break;
                     case 5:
-                        if (messages[1] === "2" || messages[1] === "4") {
-
-                            if (isValid(query) || validateEmail(query)) {
-                                messageToSend = "It appears your response contains invalid material, ensure you do not add your contacts to these responses, please enter your a brief introduction to who you are as a person";
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                    // console.log("Res " + JSON.stringify(res));
-                                }).catch(console.error);
-                            } else {
-                                messages.push(query);
-                                messageChain.set(no, messages);
-                                messageToSend += "Please type the areas your are able to work in, include suburb and city, e.g Avondale, Harare, Epworth Harare";
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                    // console.log("Res " + JSON.stringify(res));
-                                }).catch(console.error);
-                            }
-
-                        } else if (messages[1] === "1") {
-
-
-                            if (isValidDate(query) && getDaysforGigDifference(query) < 366) {
-                                messages.push(query);
-                                messageChain.set(no, messages);
-
-                                var milliSecondsSinceEpoch = new Date().valueOf().toString();
-
-                                var gig = new Gig({
-                                    details: messages[2],
-                                    budget: messages[3],
-                                    paymentStructure: messages[4],
-                                    finalDay: new Date(messages[5]),
-                                    id: milliSecondsSinceEpoch,
-                                    no: no,
-                                    date: new Date(),
-                                    approved: false,
-                                    winner: "none"
-                                });
-
-                                mongoGig.addGig(gig).then((v) => {
-                                    var id = mongoose.Types.ObjectId(v._id).toString();
-                                    if (id != "" && id != null) {
-                                        messageToSend += "Your gig was added successfully, our team will approve it shortly, and you will start receving bids from interested parties, the instructions to accept a proposal will be in the proposal message sent to you";
-                                    } else {
-                                        messageToSend += "There was an error adding your gig, please try again, You can Restart(type *#* to restart)  ";
-                                    }
-                                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                                        // console.log("Res " + JSON.stringify(res));
-                                        messageChain.delete(no);
-
-                                    }).catch(console.error);
-
-                                }).catch((e) => {
-                                    console.error(e);
-                                    messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                                    messageChain.delete(no);
-                                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                                        // console.log("Res " + JSON.stringify(res));
-                                    }).catch(console.error);
-                                });
-
-                            } else {
-                                messageToSend += "It appears you entered an invalid date, or a date more or less than 366 days away \n\nIf this is not what you want type # to restart";
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                    // console.log("Res " + JSON.stringify(res));
-                                }).catch(console.error);
-                            }
-
-
+                        if (messages[1] == "2") {
+                            messages.push(query);
+                            messageChain.set(no, messages);
+                            messageToSend = "Please type the areas your are able to offer services in, include suburb and city, e.g Avondale, Harare, Epworth Harare";
                         } else {
-                            messageToSend += "This is not what you want? You can Restart(type *#* to restart) ";
-                            client.sendMessage(msg.from, messageToSend).then((res) => {
-                                // console.log("Res " + JSON.stringify(res));
-                            }).catch(console.error);
+                            messageToSend = "This response is out of the expected one, this chat has been restarted, send hi to choose the option you want";
+                            messageChain.delete(no);
                         }
+                        client.sendMessage(msg.from, messageToSend).then((res) => {
+                            // console.log("Res " + JSON.stringify(res));
+                        }).catch(console.error);
                         break;
                     case 6:
-                        if (messages[1] == "2" || messages[1] === "4") {
+                        if (messages[1] == "2") {
+                            messages.push(query);
+                            messageChain.set(no, messages);
+                            messageToSend = "Thank you for your patience in creating your profile, we need just two more answers for your Virtual Assistant, please list all your services and the price for each separated by a comma in this format descr=amount and send them, all the you services listed above e.g website deveopmen=100USD, Mobile Application development=300USD \nOR \nMoving goods local(in town)=10USD,Moving goods above 2T=45USD \nOR \nPedicure=7USD,Manicure=10USD";
+                        } else {
+                            messageToSend = "This response is out of the expected one, this chat has been restarted, send hi to choose the option you want";
+                            messageChain.delete(no);
+                        }
+                        client.sendMessage(msg.from, messageToSend).then((res) => {
+                            // console.log("Res " + JSON.stringify(res));
+                        }).catch(console.error)
+                        break;
+                    case 7:
+                        if (messages[1] == "2") {
+                            let servicesArray = query.split(",");
+                            if (servicesArray.length < 1 || servicesArray === null) {
+                                messageToSend = "It appears you did not list your services the right way, please follow these instructions , we need just two more answers for your Virtual Assistant, please list all your services and the price for each separated by a comma in this format descr=amount and send them, all the you services listed above e.g website deveopmen=100USD, Mobile Application development=300USD \nOR \nMoving goods local(in town)=10USD,Moving goods above 2T=45USD \nOR \nPedicure=7USD,Manicure=10USD";
 
-                            if (isValid(query) || validateEmail(query)) {
-                                messageToSend = "It appears your response contains invalid material, ensure you do not add your contacts to these responses, please enter the suburb and cities you are able to work in ";
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                    // console.log("Res " + JSON.stringify(res));
-                                }).catch(console.error);
                             } else {
+                                messages.push(query);
+                                messageChain.set(no, messages);
+                                messageToSend = `These are your services and prices, your Virtual Assistant will use this to send quotations to people \n`;
+                                for (let index = 0; index < serviceArray.length; index++) {
+                                    const element = serviceArray[index];
+                                    messageToSend += `${index + 1} ${element.substring(0, element.indexOf("="))}  ${element.substring(element.indexOf("=") + 1, element.length)}}\n\n`;
+                                }
+                                messageToSend += `Please confirm these are your services and the prices are correct \n*1* Yes, it is correct \n*2* Not correct, can I retype them \nSend the number that shows the option you want e.g 1 to confirm these are correct `;
+                            }
+                        } else {
+                            messageToSend = "This response is out of the expected one, this chat has been restarted, send hi to choose the option you want";
+                            messageChain.delete(no);
+                        }
+                        client.sendMessage(msg.from, messageToSend).then((res) => {
+                            // console.log("Res " + JSON.stringify(res));
+                        }).catch(console.error);
+                        break;
+                    case 8:
+                        if (messages[1] == "2") {
+                            if (query === "1") {
+                                messages.push(query);
+                                messageChain.set(no, messages);
+                                messageToSend = "One last question, your clients, might have questions, please help them get answers quickly, by sending frequently asked questions in the format question=answer separate each by a comma e.g Do you do house calls?=yes,how much is pedicure if I have my own nails?=To ensure quality we use only our nails which we know the source and works well together the rest of our tools \nOR \nHow secure is your website?=It is very secure and even protected from bots,How long does it take to make a mobile application on average?=It takes 3 weeks for a basic application more complex apps might take longer but never more than 3 months \nOR\nHow big is your truck to move my goods?=We can take every load size 2T, 5T, 10T to carry every load,I have few items that I want to carry local, does that change the price?=No our local prices are fixed";
+                            } else if (query === "2") {
+                                messageToSend = "Okay let us do this,we need just two more answers for your Virtual Assistant, please list all your services and the price for each separated by a comma in this format descr=amount and send them, all the you services listed above e.g website deveopmen=100USD, Mobile Application development=300USD \nOR \nMoving goods local(in town)=10USD,Moving goods above 2T=45USD \nOR \nPedicure=7USD,Manicure=10USD";
+                            } else {
+                                messageToSend = "This response is out of the expected one, Please send one of the options indicated above 1 or 2 or 3 or 4";
+                            }
 
+                        } else {
+                            messageToSend = "This response is out of the expected one, this chat has been restarted, send hi to choose the option you want";
+                            messageChain.delete(no);
+                        }
+                        client.sendMessage(msg.from, messageToSend).then((res) => {
+                            // console.log("Res " + JSON.stringify(res));
+                        }).catch(console.error);
+                        break;
+                    case 9:
+                        if (messages[1] == "2") {
+                            let faqsArray = query.split(",");
+                            if (faqsArray.length < 1 || faqsArray === null) {
+                                messageToSend = "It appears you did not list your frequently asked questions the right way, please follow these instructions , your clients might have questions, please help them get answers quickly, by sending frequently asked questions in the format question=answer separate each by a comma e.g Do you do house calls?=yes,how much is pedicure if I have my own nails?=To ensure quality we use only our nails which we know the source and works well together the rest of our tools \nOR \nHow secure is your website?=It is very secure and even protected from bots,How long does it take to make a mobile application on average?=It takes 3 weeks for a basic application more complex apps might take longer but never more than 3 months \nOR\nHow big is your truck to move my goods?=We can take every load size 2T, 5T, 10T to carry every load,I have few items that I want to carry local, does that change the price?=No our local prices are fixed";
+                            } else {
+                                messages.push(query);
+                                messageChain.set(no, messages);
+                                messageToSend = `These are your questions and answers\n`;
+                                for (let index = 0; index < faqsArray.length; index++) {
+                                    const element = faqsArray[index];
+                                    messageToSend += `${index + 1} ${element.substring(0, element.indexOf("="))}  \n${element.substring(element.indexOf("=") + 1, element.length)}}\n\n`;
+                                }
+                                messageToSend += `Please confirm these are your questions and the answers are correct,  \n*1* Yes, it is correct \n*2* Not correct, can I retype them \nSend the number that shows the option you want e.g 1 to confirm these are correct `;
+                            }
+                        } else {
+                            messageToSend = "This response is out of the expected one, this chat has been restarted, send hi to choose the option you want";
+                            messageChain.delete(no);
+                        }
+                        client.sendMessage(msg.from, messageToSend).then((res) => {
+                            // console.log("Res " + JSON.stringify(res));
+                        }).catch(console.error);
+                        break;
+                    case 10:
+                        if (messages[1] == "2") {
+                            if (query === "1") {
                                 messages.push(query);
                                 messageChain.set(no, messages);
                                 let milliSecondsSinceEpoch = new Date().valueOf().toString();
@@ -1390,6 +1053,7 @@ client.on('message', async msg => {
                                         break;
                                 }
 
+                                let package = clientMap.get(no)[0];
 
 
                                 var worker = new Worker({
@@ -1398,356 +1062,64 @@ client.on('message', async msg => {
                                     skills: messages[4],
                                     brief: messages[5],
                                     areas: messages[6],
+                                    prices: messages[7],
+                                    faqs: messages[9],
+                                    package: package,
+                                    expired: false,
                                     no: no,
-                                    bids: 100,
                                     date: new Date(),
                                     id: milliSecondsSinceEpoch
                                 });
 
-                                if (messages[1] === "4") {
-                                    mongoWorker.updateWorkerProfile(worker, no).then((v) => {
-                                        messageToSend += "Account successfully updated, now you can begin to get notifications of gigz that match your new account";
-                                        client.sendMessage(msg.from, messageToSend).then((res) => {
-                                            // console.log("Res " + JSON.stringify(res));
-                                            messageChain.delete(no);
-                                        }).catch(console.error);
 
-
-                                    }).catch((e) => {
-                                        console.error(e);
-                                        messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
+                                mongoWorker.saveWorker(worker).then((v) => {
+                                    let website = "";
+                                    if (package === "7.99") {
+                                        website = `\nThe link to your web page is https://${messages[2]}.gigz.co.zw, you can use it to market your services, to add your picture use this link https://263713020524?text=${milliSecondsSinceEpoch}@pic , this picture will make your web page look even nicer, also use links above to add pictures of the work you've done, that helps you get clients`;
+                                    }
+                                    messageToSend = `Account successfully saved, now we start marketing your services, \nFor anyone to use your Virtual Assistant or Chatbot they need to use this link https://263713020524?text${messages[2]}@va your name with @va added to it \nFor anyone to add recommendations for your services,(You should encorage your clients to do so because this helps you get more clients) this should use this link https://263713020524?text=${messages[2]}@rate which is your name added @rate  \nIf you ever add more services you can add your service using this link https//263713020524?text=${messages}@services \nTo add pictures of some of the work you have done use this link https://263713020524?text${messages[2]}@portfolio  ${website} \nCongratulations on getting started on Gigz, we look foward to working together,marketing your services and giving you tools to improve your operations and efficies`;
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+                                        // console.log("Res " + JSON.stringify(res));
                                         messageChain.delete(no);
-                                        client.sendMessage(msg.from, messageToSend).then((res) => {
-                                            // console.log("Res " + JSON.stringify(res));
-                                        }).catch(console.error);
-
-                                    });
-                                } else {
-                                    mongoWorker.saveWorker(worker).then((v) => {
-                                        messageToSend += "Account successfully saved, now you can begin to get notifications of gigz that match your skills and category, you get 100 FREE bids";
-                                        client.sendMessage(msg.from, messageToSend).then((res) => {
-                                            // console.log("Res " + JSON.stringify(res));
-                                            messageChain.delete(no);
-                                        }).catch(console.error);
+                                    }).catch(console.error);
 
 
-                                    }).catch((e) => {
-                                        console.error(e);
-                                        messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                                        messageChain.delete(no);
-                                        client.sendMessage(msg.from, messageToSend).then((res) => {
-                                            // console.log("Res " + JSON.stringify(res));
-                                        }).catch(console.error);
+                                }).catch((e) => {
+                                    console.error(e);
+                                    messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
+                                    messageChain.delete(no);
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+                                        // console.log("Res " + JSON.stringify(res));
+                                    }).catch(console.error);
 
-                                    });
-                                }
-
+                                });
+                            } else if (query === "2") {
+                                messageToSend = "Okay let us do this again, One last question, your clients, might have questions, please help them get answers quickly, by sending frequently asked questions in the format question=answer separate each by a comma e.g Do you do house calls?=yes,how much is pedicure if I have my own nails?=To ensure quality we use only our nails which we know the source and works well together the rest of our tools \nOR \nHow secure is your website?=It is very secure and even protected from bots,How long does it take to make a mobile application on average?=It takes 3 weeks for a basic application more complex apps might take longer but never more than 3 months \nOR\nHow big is your truck to move my goods?=We can take every load size 2T, 5T, 10T to carry every load,I have few items that I want to carry local, does that change the price?=No our local prices are fixed";
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                    // console.log("Res " + JSON.stringify(res));
+                                }).catch(console.error);
+                            } else {
+                                messageToSend = "Please choose one of the follow options, 1 or 2, what you sent is not within the scope of the current chat, if this is not what you want type #";
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                    // console.log("Res " + JSON.stringify(res));
+                                }).catch(console.error);
                             }
-
-
-
-
-
                         } else {
-                            messageToSend += "This is not what you want? You can Restart(type *#* to restart) ";
+                            messageToSend = "This response is out of the expected one, this chat has been restarted, send hi to choose the option you want";
+                            messageChain.delete(no);
                             client.sendMessage(msg.from, messageToSend).then((res) => {
                                 // console.log("Res " + JSON.stringify(res));
                             }).catch(console.error);
                         }
                         break;
                     default:
-                        // Error message
-                        messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
+                        messageToSend = "This response is out of the expected one, this chat has been restarted, send hi to choose the option you want";
                         messageChain.delete(no);
-                        client.sendMessage(msg.from, messageToSend).then((res) => {
-                            // console.log("Res " + JSON.stringify(res));
-                        }).catch(console.error);
                         break;
-
                 }
 
+            } else { // user has not communicated yet, welcome them
 
-            }
-        } else {
-            if (query.toLowerCase() == "buy") {
-                messageChain.delete(no);
-                messages.push("First message");
-                messageChain.set(no, messages);
-                messageToSend += "Please enter your ecocash number, it works the same way as in a supermarket, you enter your number and you get a prompt to enter your PIN  e.g 0777123123,   \n\nYou can Restart(type *#* to restart) ";
-                client.sendMessage(msg.from, messageToSend).then((res) => {
-                    // console.log("Res " + JSON.stringify(res));
-                }).catch(console.error);
-            } else if (query.substring(query.indexOf('@') + 1, query.length).length === 13 && query.substring(0, query.indexOf('@')) === "bid") {
-                mongoWorker.getWorker(no).then((v) => {
-                    if (v != null) {
-                        clientMap.set(no, v);
-                        if (v.bids > 0) {
-
-                            mongoGig.findGig(query.substring(query.indexOf('@') + 1, query.length)).then((v) => {
-
-                                if (v != null) {
-                                    messages.push(query);
-                                    messageChain.set(no, messages);
-                                    myGigsMap.set(no, v);
-                                    let el = v;
-                                    messageToSend += `This is the gig you want to bid for \n\nYOU GET:${calculateMyCompensation(el.budget)}USD ${el.paymentStructure} \n${el.details}  \n${getDaysDifference(el.finalDay)} left to bid \n\n`;
-                                    messageToSend += `Type your bid(application/proposal for the job) for the gig, this means basically, type your OFFER for the gig, it can include why they should give you this task and not anyone else, your best price, ,type it *right after this message* \n\nIf this is not what you want type # to restart`;
-                                } else {
-                                    messageToSend += `The gig you typed has not been found, please check the link again or type # to restart`;
-                                }
-
-
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                }).catch(console.error);
-
-
-                            }).catch((e) => {
-                                console.error(e);
-                                messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                                messageChain.delete(no);
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                    // console.log("Res " + JSON.stringify(res));
-                                }).catch(console.error);
-
-                            });
-
-                        } else {
-                            messageToSend += `It appears you are out of bids, you can buy more bids just 100RTGS Ecoash for 5 bids,to buy type Buy or click this link to https://wa.me/263713020524?text=Buy `;
-                            client.sendMessage(msg.from, messageToSend).then((res) => {
-                            }).catch(console.error);
-                        }
-
-                    } else {
-                        messageToSend += `It appears you do not have any account with us, to able to bid you need to have an account, to create an account, after this message, type hi, and select option 2 `;
-                        messageChain.delete(no);
-                        client.sendMessage(msg.from, messageToSend).then((res) => {
-                        }).catch(console.error);
-                    }
-
-                }).catch(console.error);
-
-            } else if (query.substring(query.indexOf('@') + 1, query.length - 17) === "accept" && query.substring(0, query.indexOf('@')).length === 13) { // accept bid 
-
-
-                var id = query.substring(0, query.indexOf('@'));
-                mongoWorker.getWorkerById(id).then((v) => {
-                    messageToSend += `Congratulations your bid was accepted, remember to ask them to give you review, as that will improve your chances of getting more and more gigz and build your port-folio, our team will be in touch with you about Gigz commission, failure to pay it after getting paid will result in this number being permanantly blocked from our service, we only work with genuine people, this is part of the test`;
-                    client.sendMessage(v[0].no, messageToSend).then((res) => {
-                        // console.log("Res " + JSON.stringify(res));
-                        var mess = `We are glad we connected you to the right person, however we highly recommended signing the affidavit below with clear milestones on the task.Thank you accepting this person's bid, you can contact the person who sent the bid on +${v[0].no.substring(0, no.indexOf('@'))} , remember to leave a review after the task is done(Our team will contact you to ask about your experience), this helps the person build a portfolio and helps them connect with other people who need the same work done \nTo Review click https://wa.me/263713020524?text=${v[0].id}@rate`;
-                        client.sendMessage(no, mess).then((res) => {
-
-                        }).catch(console.error);
-                        var gigId = query.substring(query.indexOf('t') + 1, query.indexOf('@gig'));
-                        mongoGig.addWorkHistory(id, gigId).catch(console.error);
-                    }).catch(console.error);
-                    var mediaMessage = "Take advantage of the affidavit sent to you, to sign agreement before the task starts,ensure the task is clearly communicated and signed to that effect";
-                    const media = MessageMedia.fromFilePath('./gigzaffidavit.pdf');
-                    client.sendMessage(v[0].no, media, { caption: mediaMessage }).catch(console.error);
-                    client.sendMessage(no, media, { caption: mediaMessage }).catch(console.error);
-                    messageChain.delete(no);
-
-
-
-
-
-                }).catch((e) => {
-                    console.error(e);
-                    messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                    messageChain.delete(no);
-                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                        // console.log("Res " + JSON.stringify(res));
-                    }).catch(console.error);
-
-                });
-
-
-            } else if (query.substring(query.indexOf('@') + 1, query.length) === "profile" && query.substring(0, query.indexOf('@')).length === 13) { // see proposal bidder profile
-                var id = query.substring(0, query.indexOf('@'));
-                mongoWorker.getWorkerById(id).then((v) => {
-
-                    if (v.length > 0) {
-                        messageToSend += `Full Name: ${v[0].name} \n\nBrief Intro:${v[0].brief} \n\nSkills: ${v[0].skills} \n\nAreas able to carry out tasks in: ${v[0].areas} \n\nTo see their task history click \nhttps://wa.me/263713020524?text=${v[0].id}@history \n\nTo see their reviews click \nhttps://wa.me/263713020524?text=${v[0].id}@reviews`;
-                    } else {
-                        messageToSend += `Profile not found, type # to restart`;
-                    }
-
-                    client.sendMessage(no, messageToSend).then((res) => {
-                        // console.log("Res " + JSON.stringify(res));
-                        messageChain.delete(no);
-                    }).catch(console.error);
-
-                }).catch((e) => {
-                    console.error(e);
-                    messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                    messageChain.delete(no);
-                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                        // console.log("Res " + JSON.stringify(res));
-                    }).catch(console.error);
-                });
-            } else if (query.substring(query.indexOf('@') + 1, query.length) === "reviews" && query.substring(0, query.indexOf('@')).length === 13) { // see proposal bidder reviews
-                var id = query.substring(0, query.indexOf('@'));
-                mongoWorker.getWorkerReviews(id).then((v) => {
-
-                    if (v.length > 0) {
-                        messageToSend += `These are the last reviews from the last few gigz this person worked on \n\n`
-                        v.forEach((e) => {
-                            messageToSend += `${e.review} \n\n`;
-                        });
-                        messageToSend += `________________END_______________________`;
-                    } else {
-                        messageToSend += `This person does not have reviews yet`;
-                        messageChain.delete(no);
-                    }
-
-                    client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                    }).catch(console.error);
-
-
-                }).catch((e) => {
-                    console.error(e);
-                    messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                    messageChain.delete(no);
-                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                        // console.log("Res " + JSON.stringify(res));
-                    }).catch(console.error);
-
-                });
-            } else if (query.substring(query.indexOf('@') + 1, query.length) === "history" && query.substring(0, query.indexOf('@')).length === 13) { // see worker history
-                var id = query.substring(0, query.indexOf('@'));
-                mongoGig.getWorkerHistory(id).then((v) => {
-
-                    if (v.length > 0) {
-                        messageToSend += `These are the last gigz this person worked on\n\n`;
-                        v.forEach((e) => {
-                            messageToSend += `Gig \n${e.details} \n\n`;
-                        });
-                        messageToSend += `________________END__________________`;
-                    } else {
-                        messageToSend += `This person is yet to get a gig`;
-                        messageChain.delete(no);
-                    }
-
-                    client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                    }).catch(console.error);
-
-
-                }).catch((e) => {
-                    console.error(e);
-                    messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                    messageChain.delete(no);
-                    client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                    }).catch(console.error);
-                });
-            } else if (query.substring(query.indexOf('@') + 1, query.length) === "rate" && query.substring(0, query.indexOf('@')).length === 13) { // see proposal bidder reviews
-                messages.push(query);
-                messageChain.set(no, messages);
-                messageToSend += `Thank you for rating the service you got, can you please type briefly what was your experience working with this person, how well they carried out the tasks given to them`;
-                client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                }).catch(console.error);
-            } else if (query.toLowerCase() == "unsubscribe" || query.toLowerCase() == "unsubs" || query.toLowerCase() == "unsub") {
-                mongoWorker.unsubscribe(no).then((res) => {
-                    messageToSend += "It was an honor to serve you, all the best in the next part of your journey";
-                    messageChain.delete(no);
-                    messages = [];
-                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                        // console.log("Res " + JSON.stringify(res));
-                    }).catch((err) => {
-                        console.log(e);
-                        messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                        messageChain.delete(no);
-                        client.sendMessage(msg.from, messageToSend).then((res) => {
-                            // console.log("Res " + JSON.stringify(res));
-                        }).catch(console.error);
-                    });
-
-                }).catch(console.error);
-            } else if (query.toLowerCase() === "add") {
-                messages.push(query);
-                messageChain.set(no, messages);
-                messageToSend += `Can you type the full details of the property incuding rent price, if it has tiles, water situation, how close it is to main roads, security, if deposit is needed etc`;
-                client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                }).catch(console.error);
-            } else if (query.substring(query.indexOf('@') + 1, query.length - 13) === "interested" && query.substring(0, query.indexOf('@')).length === 13 && query.substring(query.indexOf('d') + 1, query.length).length === 13) { // Send bid invite
-                messages.push(query);
-                messageChain.set(no, messages);
-                return mongoGig.findGigByPosterId(no).then((res) => {
-
-                    if (res.length > 0) {
-                        res.forEach(el => {
-                            if (el.category.includes("Facilities and property services") && el.skills.toLowerCase().includes("accomodation") || el.skills.includes("accommodation") || el.skills.includes("real estate") || el.skills.toLowerCase().includes("agent") || el.skills.toLowerCase().includes("agents")) {
-                                let propertyId = query.substring(query.indexOf('d') + 1, query.length);
-                                let posterId = query.substring(0, query.indexOf('@'));
-
-                                return firebase.getRentalPropertyById(propertyId).then((querySnapshot) => {
-
-                                    if (querySnapshot.empty) {
-                                        messageToSend = "It appears the property is no longer available, you can check again later, or tomorrow";
-                                        client.sendMessage(no, messageToSend).then((res) => {
-
-                                        }).catch(console.error);
-                                    } else {
-
-                                        return mongoWorker.getWorkerById(posterId).then((v) => {
-
-                                            let propertyDesc = "";
-                                            querySnapshot.forEach((doc) => {
-
-                                                var info = doc.data();
-                                                propertyDesc = `${info.description} `;
-
-
-                                            });
-
-                                            if (v != null) {
-                                                //TODO Check if this person has a property gig, add to the text what they are offering, if there is no gig create one and send to this person??? then if this person says its available its a bid 
-                                                messageToSend = `I saw this property \n\n${propertyDesc.substring(0, propertyDesc.length - 115)} \n\nIs it still available? If it is available here is my offer, please *click the link*(link below) and type Property Available if it is still available  \n\n${el.details} \nYOU GET:${calculateMyCompensation(el.budget)}USD ${el.paymentStructure}  \n${getDaysDifference(el.finalDay)} left to bid\nTo Bid for this gig(IF AVAILABLE CLICK THIS LINK and type Property Available) click this link https://wa.me/263713020524?text=bid@${el.id}`;
-                                            } else {
-                                                messageToSend = `It appears we could not find the person who posted this property, please try again later, or file a report by typing #, then type hi, then after the welcome message type 6, to send us feedback`;
-
-                                            }
-                                            client.sendMessage(v[0].no, messageToSend).then((res) => {
-
-                                            }).catch(console.error);
-
-                                            let mess = "The person has been notified of your interest";
-                                            client.sendMessage(no, mess).then((res) => {
-
-                                            }).catch(console.error);
-
-                                        }).catch(console.error);
-
-
-                                    }
-
-                                }).catch(console.error);
-                            }
-
-                        });
-
-                    } else {
-                        messages = [];
-                        messageChain.delete(no);
-                        messageToSend = "It appears you are yet to create a gig, you need to create a gig before you can send a message of your interest to this person. \nTo find out about what a gig is, you can look at the option How gig works, on the welcome message"
-                        client.sendMessage(no, messageToSend).then((res) => {
-
-                        }).catch(console.error);
-                    }
-
-                }).catch(console.error);
-
-
-
-
-
-            } else {
-
-                addingReport(no, "Welcome", "Welcome");
                 messages.push("First message");
                 messageChain.set(no, messages);
                 var timeOfDay = "";
@@ -1759,35 +1131,79 @@ client.on('message', async msg => {
                     timeOfDay = "Day";
                 }
 
-                messageToSend = `Pleasant ${timeOfDay} ${name}, welcome  to Gigz, a gig is a task, Gigz is a place for tasks,posting a gig is FREE  \n\nPlease type one of the options below e.g 1 \n\n\n0)What is Gigz? \n\n1) Type 1 to  POST a gig  \n\n2) Type 2 to register or  see gigz that match your skills  \n\n3) Type 3 to search for other gigz   \n\n4)Type 4 to update your account  \n\n5)Type 5 to see how this works \n\n6)Type 6 to send us feedback  \n\n7)Type 7 to see our terms and conditions as at 1.4.2022 \n\n8) See rental property \n\n\nBy using our platform you agreeing to terms and conditions as at 1.04.2022 \n#Believe `;
+                messageToSend = `Pleasant ${timeOfDay} ${name}, welcome to Gigz \n\n \n*1* Search for a service \n*2* Register \n*3* How does this work?   \n\nSend the number of the option you want, e.g send 2 if you want to register as a service provider`;
 
                 client.sendMessage(msg.from, messageToSend).then((res) => {
 
                 }).catch(console.error);
 
-
             }
+
         }
 
 
+        // messageToSend = `${no} sent in ${query}`;
+        // client.sendMessage("263772263139@c.us", messageToSend).then((res) => {
+        // console.log("Res " + JSON.stringify(res));
+
+        // }).catch(console.error);
+
     }
+    //else {
+
+
+    //     let k = no.substring(no.indexOf('-'), no.length);
+
+    //     if (groupChain.has(k)) {
+
+    //         if (groupChain.get(k).length > 8) {
+    //             client.sendMessage(no, ads[sentMessages % 8]).then((res) => {
+    //                 sentMessages++;
+    //                 console.log(`Sent ${sentMessages}`);
+    //                 groupChain.delete(k);
+    //             }).catch(console.error);
+
+    //         } else {
+    //             let noOfM = groupChain.get(k);
+    //             noOfM.push("m");
+    //             groupChain.set(k, noOfM);
+    //         }
+
+    //     } else {
+    //         let noOfM = [];
+    //         noOfM.push("m");
+    //         groupChain.set(k, noOfM);
+    //         client.sendMessage(no, ads[sentMessages % 8]).then((res) => {
+    //             // client.sendMessage(no, ads[sentMessages % 9]).then((res) => {
+    //             sentMessages++;
+    //             console.log(`Sent ${sentMessages}`);
+    //         }).catch(console.error);
+    //     }
+
+    // }
+
+
+
+
 
 
 });
 
-function isNumeric(str) {
-    if (typeof str != "string") return false // we only process strings!  
-    return !isNaN(str) && // use type coercion to parse the _entirety_ of the string (`parseFloat` alone does not do this)...
-        !isNaN(parseFloat(str)) // ...and ensure strings of whitespace fail
+// My useful functions
+
+const checkPayment = no => {
+    let day = dayOfYear(new Date);
+    try {
+        return paymentService.checkSubscriptionStatus(no, day)
+    } catch (e) {
+        console.error(e);
+    }
 }
 
-function validateEmail(email) {
-    email = email || "";
-    let re = /(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])/;
-    return re.test(email.toLowerCase().trim());
-}
+const dayOfYear = date =>
+    Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
 
-function isValid(p) {
+const isValidPhoneNumber = p => {
     var sentences = p.split(/\r?\n/);
     for (let i = 0; i < sentences.length; i++) {
         var phoneRe = /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im;
@@ -1800,132 +1216,12 @@ function isValid(p) {
     return false;
 }
 
-function calculateMyCompensation(amount) {
-    let final = parseInt(amount) - (0.1 * parseInt(amount));
-    return parseInt(final);
-}
-
-function isValidDate(date) {
-    return (new Date(date) !== "Invalid Date") && !isNaN(new Date(date));
-}
-
-function getDaysforGigDifference(date) {
-    var date1 = new Date();
-    var date2 = new Date(date);
-
-    // To calculate the time difference of two dates
-    var Difference_In_Time = date2.getTime() - date1.getTime();
-
-    return parseInt(Difference_In_Time / (1000 * 3600 * 24));
-}
-
-function getDaysDifference(date) {
-    var date1 = new Date();
-    var date2 = new Date(date);
-
-    // To calculate the time difference of two dates
-    var Difference_In_Time = date2.getTime() - date1.getTime();
-
-    // To calculate the no. of days between two dates
-    if (parseInt(Difference_In_Time / (1000 * 3600 * 24)) > 1) {
-        return `${parseInt(Difference_In_Time / (1000 * 3600 * 24))} days`;
-
-    } else if (parseInt(Difference_In_Time / (1000 * 3600 * 24)) === 1) {
-        return `${parseInt(Difference_In_Time / (1000 * 3600 * 24))} day`;
-    } else {
-        return `Few hours`;
-    }
-
-}
-
-function addingReport(no, category, details) {
-    var report = new Report({
-        category: category,
-        details: details,
-        no: no,
-        date: new Date(),
-    });
-
-    reportsService.addReport(report).catch(console.error);
-}
-
-async function messagePeople(el) {
-    try {
-        var clients = await mongoWorker.getClientsBySkillsCat(el);
-        if (clients != null && clients.length > 0) {
-            var messageToSend = `New Gig Alert \n\n${el.details}  \nYOU GET:${calculateMyCompensation(el.budget)} ${el.paymentStructure}  \n${getDaysDifference(el.finalDay)} left to bid \nTo Bid for this gig click this link https://wa.me/263713020524?text=bid@${el.id} `;
-            var alreadySent = [];
-            clients.forEach(element => {
-
-                //Not in the array
-                if (alreadySent.indexOf(element.no) < 0) {
-                    alreadySent.push(element.no);
-                    client.sendMessage(element.no, messageToSend).then(() => {
-
-                    }).catch(console.error);
-
-                }
-
-            });
-
-            twitter.post('statuses/update', { status: messageToSend }, function (error, tweet, response) {
-                if (!error) {
-                    console.log("Tweet sent");
-                }
-            });
-
-
-            var mess = `Update from Gigz: Your Gig has been approved! \nYou should begin to get bids soon!`;
-
-            if (el.skills.toLowerCase().includes("accommodation") || el.skills.toLowerCase().includes("real estate") || el.skills.toLowerCase().includes("agent")) {
-                mess += `\nOur goal is to remove bogus agents from operating in this space, if the property you are moving from will become vacant after you move, or you know a vacant property and would like to help another tenant move there, click this link https://wa.me/263713020524?text=add \nYou will not only be helping stopping FRAUD and also you can do it part time, and the FINDER'S FEE WILL BE YOURS making extra income`;
-            }
-            client.sendMessage(el.no, mess).catch(console.error);
-
-
-
-
-        }
-    } catch (e) {
-        console.error(e);
-    }
-
-
-}
-
-// async function messageAccomodationPeople(house, contact) {
-//     try {
-//         var gigz = await mongoGig.getAccomodationGigz(house);
-//         if (gigz != null && gigz.length > 0) {
-//             gigz.forEach(element => {
-//                 // Will add this soon
-//                 // if (parseInt(element._doc.confidenceScore) > 50) {
-//                 var messageToSend = `Update from gigz \n\n${house} \n\nThis is to help connect you with agents.Gigz is not affiliated with this agent but they might be able to you get the exact accomodation you want`;
-//                 client.sendMessage(element.no, messageToSend).catch(console.error);
-//                 // }
-
-//             });
-//         }
-//     } catch (e) {
-//         console.error(e);
-//     }
-
-// }
-
-async function checkChats() {
-    var chats = await client.getChats();
-    chats.forEach((elem) => {
-        if (elem.unreadCount > 0 && !elem.isGroup) {
-            client.sendMessage(elem.id._serialized, "Introducting Gigz, connecting people building dreams, there was a network error, please restart by typing hie").catch(console.error);
-        }
-    });
-
-
-}
-
 client.on('status@broadcast', async status => {
     delete (status);
 });
+
+
+
 
 
 
@@ -1940,56 +1236,50 @@ app.use(
 
 app.use(express.json());
 
+app.post('/api/v1/message', (req, res) => {
 
-app.get('/api/v1/gigz/:skip', (req, res) => {
-    mongoGig.getGigsToApproval(req.params.skip).then((v) => {
+    var contacts = req.body.contacts.split(",");
+    contacts.forEach(element => {
 
-        res.json(v)
+        var id = `263${element}@c.us`;
+        client.sendMessage(id, req.body.message).then(() => {
+            console.log(`Sent message to ${element}`);
+        }).catch(console.error);
 
-    }).catch(console.error);
+
+    });
+
+    res.send("hi");
+
+
+
 });
 
-app.post('/api/v1/approve', (req, res) => {
+app.post('/api/v1/checkpayments', async (req, res) => {
 
-    messagePeople(req.body.gig);
-    mongoGig.approve(req.body.gig).then((v) => {
+    var clients = await paymentService.getAllPayments();
+    clients.forEach(element => {
 
-        res.json(v);
+        let id = element.no;
+        checkPayment(id).then((oneClient) => {
 
-    }).catch(console.error);
+            let statement = "";
+            if (!oneClient.expired && checkPayment(id).days < 6) {
+                statement = `only ${days} left`;
+            } else if (oneClient.expired) {
+                statement = `expired`;
+            }
+            var messageToSend = `Good day \nKindly note your subscription has , ensure you resubscribe soon so you *continue* to get full access to our services and say guard your unique username, which maybe taken by someone else if the account is not in use for a long time`;
+            client.sendMessage(id, messageToSend).then(() => {
+                console.log(`Sent to ${element.no}`);
+            }).catch(console.error);
+        }).catch(console.error);
+
+
+    });
+
+
 });
-
-app.post('/api/v1/delete', (req, res) => {
-
-    mongoGig.deleteGig(req.body.id).then((v) => {
-        res.json(v);
-    }).catch(console.error);
-});
-
-
-app.post('/api/v1/addedhouse', (req, res) => {
-    // messageAccomodationPeople(req.body.house, req.body.contact);
-    var tweet = `${req.body.house.substring(0, 200)} Whatsapp 0713020524 for more leads`;
-    twitter.post('statuses/update', { status: tweet }, function (error, tweet, response) {
-        if (!error) {
-            console.log("Tweet sent");
-        }
-    })
-});
-
-app.post('/api/v1/checkchats', (req, res) => {
-    checkChats();
-});
-
-app.post('/api/v1/expire', (req, res) => {
-    mongoGig.expire().then((v) => {
-        res.json(v);
-    }).catch(console.error);
-});
-
-
-
-
 
 
 

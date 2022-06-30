@@ -22,7 +22,6 @@ module.exports = {
         const filter = { no: no };
         const update = { bids: bids };
         return Worker.findOneAndUpdate(filter, update);
-        worker.save();
     },
     getWorkerById: function (id) {
         return Worker.find({
@@ -68,6 +67,22 @@ module.exports = {
         }
         return allWorkers;
     },
+    getWorkers: function (searchString, number) {
+        let query = { $and: [{ expired: false }, { $or: [{ $text: { $skills: searchString } }, { $text: { $skills: searchString } }, { $text: { $category: searchString } }, { $text: { $areas: searchString } },] }] };
+        return Worker.find(query).skip(number).limit(7);
+    },
+    checkName: function (name) {
+        return Worker.findOne({ name: name });
+    },
+    addPortfolio: function (portfolio) {
+        return portfolio.save();
+    },
+    addPicture: function (no, url) {
+        const filter = { no: no };
+        const update = { pic: url };
+        return Worker.findOneAndUpdate(filter, update);
+
+    }
 
 
 

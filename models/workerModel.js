@@ -1,22 +1,24 @@
 var mongoose = require('mongoose');
-// const mongoose_fuzzy_searching = require('mongoose-fuzzy-searching-v3');
 var Schema = mongoose.Schema;
 
 var WorkerSchema = new Schema({
     name: { type: String, required: true },
-    skills: { type: String, index: 'text' },
     category: { type: String, required: true },
+    skills: { type: String, required: true },
     brief: { type: String, required: true },
     no: { type: String, required: true },
     areas: { type: String, required: true },
-    bids: { type: Number, required: true },
-    date: { type: Date },
+    expired: { type: Boolean, required: true },
+    prices: { type: String },
+    faqs: { type: String },
+    package: { type: String, required: true },
+    date: { type: Date, required: true },
     id: { type: String, required: true },
+    pic: { type: String },
 });
 
 
 
-
-// WorkerSchema.plugin(mongoose_fuzzy_searching, { fields: ['skills', 'category'] });
+WorkerSchema.index({ category: 'text', skills: 'text', areas: 'text' });
 // Export model.
-module.exports = mongoose.model('Worker', WorkerSchema, 'workers');
+module.exports = mongoose.model('Worker', WorkerSchema, 'workers');	
