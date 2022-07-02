@@ -1,4 +1,5 @@
-const MONGO_DB_URL = "mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000";
+// const MONGO_DB_URL = "mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000";
+const MONGO_DB_URL = `mongodb+srv://gigzadmin:Zimbabwe1@cluster0.h7zqs.mongodb.net/?retryWrites=true&w=majority`
 
 
 module.exports = function initConnection() {

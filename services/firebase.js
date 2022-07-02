@@ -8,6 +8,7 @@ admin.initializeApp({
 });
 
 const db = admin.firestore();
+const storage = admin.storage();
 
 
 
@@ -52,6 +53,22 @@ module.exports = {
     return res;
 
   },
+  addImage: async function (name, imageString, saveAs) {
+    var storageRef = firebase.storage().ref().child(`${name}/${saveAs}`);
+    let url = "";
+    try {
+      url = await storageRef.getDownloadURL();
+      storageRef.putString(imageString, 'base64').then(function (snapshot) {
+        console.log('Uploaded a base64 string!');
+      });
+
+      return url;
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+
+  }
 
 
 

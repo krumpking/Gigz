@@ -1,6 +1,7 @@
 var Worker = require('../models/workerModel');
 var Review = require('../models/reviewsModel');
 var Worker = require('../models/workerModel');
+const portfolioModel = require('../models/portfolioModel');
 
 module.exports = {
     getWorker: function (no) {
@@ -9,40 +10,23 @@ module.exports = {
     saveWorker: function (worker) {
         return worker.save();
     },
-    reduceWorkerBids: async function (no) {
-        let worker = await Worker.findOne({ no: no });
-        let bids = worker.bids - 1;
-        const filter = { no: no };
-        const update = { bids: bids };
-        return Worker.findOneAndUpdate(filter, update);
-    },
-    addWorkerBids: async function (no) {
-        let worker = await Worker.findOne({ no: no });
-        let bids = worker.bids + 5;
-        const filter = { no: no };
-        const update = { bids: bids };
-        return Worker.findOneAndUpdate(filter, update);
-    },
     getWorkerById: function (id) {
         return Worker.find({
             id: id
         });
     },
-    getWorkerReviews: function (id) {
+    getWorkerReviews: function (name) {
         return Review.find({
-            reviewed_person_id: id
+            name: name
         }).limit(7);
     },
     addReview: async function (review) {
-
-        var rvw = await Review.findOne({ reviewer_no: review.reviewer_no, reviewed_person_id: review.reviewed_person_id });
+        var rvw = await Review.findOne({ reviewer_no: review.reviewer_no });
         if (rvw === null) {
             return review.save();
         } else {
             return null;
         }
-
-
     },
     unsubscribe: async function (no) {
         return Worker.deleteOne({ no: no });
@@ -68,8 +52,7 @@ module.exports = {
         return allWorkers;
     },
     getWorkers: function (searchString, number) {
-        let query = { $and: [{ expired: false }, { $or: [{ $text: { $skills: searchString } }, { $text: { $skills: searchString } }, { $text: { $category: searchString } }, { $text: { $areas: searchString } },] }] };
-        return Worker.find(query).skip(number).limit(7);
+        return Worker.find({ $text: { $search: searchString }, expired: false }).skip(number).limit(7);
     },
     checkName: function (name) {
         return Worker.findOne({ name: name });
@@ -82,6 +65,16 @@ module.exports = {
         const update = { pic: url };
         return Worker.findOneAndUpdate(filter, update);
 
+    },
+    getPortfolio: function (name) {
+        return portfolioModel.find({
+            name: name,
+        })
+    },
+    addVA: async function (no, prices, faqs) {
+        const filter = { no: no };
+        const update = { prices: prices, faqs: faqs };
+        return Worker.findOneAndUpdate(filter, update);
     }
 
 

@@ -7,13 +7,13 @@ class QGenerator {
     }
 
     generateHeaders(doc) {
-        const billingAddress = this.q.addresses.billing
+        // const billingAddress = this.q.addresses.billing
 
         doc
             // .image('./home/unashe/Documents/repository/mkbot/services/logo.png', 0, 0, { width: 250 })
             // .fillColor('#000')
             .fontSize(20)
-            .text('Quotation', 275, 50, { align: 'right' })
+            .text(`${this.q.name} Quotation`, 275, 50, { align: 'right' })
             .fontSize(10)
             .text(`Quotation Number: ${this.q.qNumber}`, { align: 'right' })
             .text(`Due: ${this.q.dueDate}`, { align: 'right' })
@@ -48,7 +48,7 @@ class QGenerator {
             .fontSize(10)
             .text('Item Code', itemCodeX, tableTop, { bold: true })
             .text('Description', descriptionX, tableTop)
-            .text('Quantity', quantityX, tableTop)
+            // .text('Quantity', quantityX, tableTop)
             .text('Price', priceX, tableTop)
             .text('Amount', amountX, tableTop)
 
@@ -64,13 +64,29 @@ class QGenerator {
                 .fontSize(10)
                 .text(item.itemCode, itemCodeX, y)
                 .text(item.description, descriptionX, y)
-                .text(item.quantity, quantityX, y)
+                // .text(item.quantity, quantityX, y)
                 .text(`$ ${item.price}`, priceX, y)
                 .text(`$ ${item.amount}`, amountX, y)
         }
     }
 
     generateFooter(doc) {
+
+        const tableTop = 270
+        const itemCodeX = 50
+        const descriptionX = 100
+        const quantityX = 250
+        const priceX = 300
+        const amountX = 350
+
+        doc
+            .fontSize(10)
+            .text(``, itemCodeX, y)
+            .text(``, descriptionX, y)
+            // .text(item.quantity, quantityX, y)
+            .text(``, priceX, y)
+            .text(`Total`, this.q.subtotal, y, { bold: true })
+
         doc
             .fontSize(10)
             .text(`Payment due upon receipt. `, 50, 700, {
@@ -81,9 +97,7 @@ class QGenerator {
     generate() {
         let theOutput = new PDFGenerator
 
-        console.log(this.q)
-
-        const fileName = `Quotation ${this.q.qNumber}.pdf`
+        const fileName = `${this.q.name} quotation ${this.q.qNumber}.pdf`
 
         // pipe to a writable stream which would save the result into the same directory
         theOutput.pipe(fs.createWriteStream(fileName))
