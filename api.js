@@ -114,6 +114,7 @@ client.on('message', async msg => {
 
     // Check for media
     if (msg.hasMedia) {
+
         attachmentData = await msg.downloadMedia();
         // for (let index = 0; index < 10; index++) {
         //     // const media = MessageMedia.fromFilePath(`./Quotation 1234.pdf`);
@@ -199,10 +200,11 @@ client.on('message', async msg => {
             messageChain.delete(no);
             var id = query.substring(0, query.indexOf('@'));
             mongoWorker.getWorkerById(id).then((v) => {
+                let website = "";
                 if (v.package === "7.99") {
                     website = `${v.name}.gigz.co.zw`;
                 }
-                messageToSend = `Name: ${v.name} \nBrief Intro:${v.brief} \nServices: ${v.skills} \nAreas able to serve: ${v.areas} \nTo see their reviews click \nhttps://wa.me/263713020524?text=${v.name}@reviews \nTo chat to their virtual assistant click \nhttps://wa.me/263713020524?text=${v.name}@va   ${website} \n_Contact_: https://wa.me/${el.no.substring(0, el.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Gigz+I+am+interested+in+your+services`;
+                messageToSend = `Name: ${v.name} \nBrief Intro:${v.brief} \nServices: ${v.skills} \nAreas able to serve: ${v.areas} \nTo chat to their Chatbot(Virtual Assistant) click \nhttps://wa.me/263713020524?text=${v.name}@va   ${website} \n_Contact_: https://wa.me/${v.no.substring(0, v.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Gigz+I+am+interested+in+your+services`;
                 client.sendMessage(v.no, messageToSend).then((res) => {
                     // console.log("Res " + JSON.stringify(res));
                 }).catch(console.error);
@@ -235,29 +237,47 @@ client.on('message', async msg => {
             }).catch((console.error));
         } else if (query.substring(query.indexOf('@') + 1, query.length) === "portfolio" && query.includes("@portfolio")) { // See portfolio
             messageChain.delete(no);
-            messages.push(query);
-            messageChain.set(no, messages);
-            messageToSend = "You want to add to your portfolio which showcases the work you have done, great, we take one picture per description, we advise you to post *only the best pictures*";
-            client.sendMessage(msg.from, messageToSend).then((res) => {
-                // console.log("Res " + JSON.stringify(res));
-            }).catch((console.error));
+            let businessName = query.substring(0, query.indexOf('@'));
+            mongoWorker.checkName(businessName).then((v) => {
+                if (v === null) {
+                    messageChain.delete(no);
+                    messageToSend = "It appears this user is yet to create an account, only registered people can add their portfolio pictures";
+                } else {
+                    messages.push(query);
+                    messageChain.set(no, messages);
+                    messageToSend = "You want to add to your portfolio which showcases the work you have done, great, we take one picture per description, we advise you to post *only the best pictures*";
+                }
+                client.sendMessage(msg.from, messageToSend).then((res) => {
+                    // console.log("Res " + JSON.stringify(res));
+                }).catch((console.error));
+            }).catch(console.error);
         } else if (query.substring(query.indexOf('@') + 1, query.length) === "pic" && query.substring(0, query.indexOf('@')).length === 13) {
             messageChain.delete(no);
-            messages.push(query);
-            messageChain.set(no, messages);
-            messageToSend = "You want to add your picture, great, send your picture now";
-            client.sendMessage(msg.from, messageToSend).then((res) => {
-                // console.log("Res " + JSON.stringify(res));
-            }).catch((console.error));
+            let id = query.substring(0, query.indexOf('@'));
+            mongoWorker.getWorkerById(id).then((v) => {
+                if (v === null) {
+                    messageChain.delete(no);
+                    messageToSend = "It appears this user is yet to create an account, only registered people can add their profile pictures";
+                } else {
+                    messages.push(query);
+                    messageChain.set(no, messages);
+                    clientMap.set(no, v);
+                    messageToSend = "You want to add your picture, great, send your picture now";
+                }
+                client.sendMessage(msg.from, messageToSend).then((res) => {
+                    // console.log("Res " + JSON.stringify(res));
+                }).catch((console.error));
+            }).catch(console.error);
+
         } else if (query.substring(query.indexOf('@') + 1, query.length) === "rate" && query.includes("@rate")) { // rate or put recommendations
             messageChain.delete(no);
             let username = query.substring(0, query.indexOf('@'));
-            mongoWorker.checkName(username).then((v) => {
+            mongoWorker.checkName(username.toLowerCase()).then((v) => {
 
                 if (v === null) {
                     messageToSend += `We do not appear to have this user in our database, please ask them again, and try again`;
                 } else {
-                    messages.push(query);
+                    messages.push(query.toLowerCase());
                     messageChain.set(no, messages);
                     messageToSend += `Thank you for rating the service you got, on a scale of 1 to 5, how would you rate the service you got, you can only type a number between 1 and 5`;
                 }
@@ -287,7 +307,7 @@ client.on('message', async msg => {
 
             if (messageChain.has(no)) { // check if user is already in communication
                 messages = messageChain.get(no);
-
+                console.log(messages);
                 switch (messages.length) { // looking to get the context of the current conversation
                     case 1:
                         if (messages.length > 2) {
@@ -362,42 +382,50 @@ client.on('message', async msg => {
                                 }
                                 client.sendMessage(msg.from, messageToSend).then((res) => {
 
-                                }).catch((err) => {
-                                    console.log("Error on client welcome message => " + err)
-                                });
+                                }).catch(console.error);
                             } else if (messages[0].substring(messages[0].indexOf('@') + 1, messages[0].length) === "pic" && messages[0].substring(0, messages[0].indexOf('@')).length === 13) {
-                                let businessName = messages[0].substring(0, messages[0].indexOf('@'));
+                                let businessName = clientMap.get(no).name;
+                                if (msg.hasMedia) {
+                                    return firebase.addImage(businessName, attachmentData.data, "pic").then((r) => {
 
-                                return firebase.addImage(businessName, attachmentData.data.split(',')[1], "pic").then((r) => {
-
-                                    if (r === null) {
-                                        messageToSend = `There was an error adding your display picture please try again, if the problem persists try again later, https://263713020524?text=${businessName}@pic`;
-                                        messageChain.delete(no);
-                                        client.sendMessage(msg.from, messageToSend).then((res) => {
-
-                                        }).catch(console.error);
-                                    } else {
-                                        return mongoWorker.addPicture(no, r).then((r) => {
-                                            //TODO check is was added successfully
-                                            messageToSend = `Your display picture was added successfully, if you want to change it, you can do so by clicking https://263713020524?text=${businessName}@pic`;
+                                        if (r === null) {
+                                            messageToSend = `There was an error adding your display picture please try again, if the problem persists try again later, https://wa.me/${gigzBot}?text=${businessName}@pic`;
                                             messageChain.delete(no);
                                             client.sendMessage(msg.from, messageToSend).then((res) => {
 
                                             }).catch(console.error);
-                                        }).catch(console.error);
-                                    }
+                                        } else {
+                                            return mongoWorker.addPicture(no, r).then((r) => {
+                                                //TODO check is was added successfully
+                                                messageToSend = `Your display picture was added successfully, if you want to change it, you can do so by clicking https://wa.me/${gigzBot}?text=${businessName}@pic`;
+                                                messageChain.delete(no);
+                                                client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                                                }).catch(console.error);
+                                            }).catch(console.error);
+                                        }
 
 
-                                }).catch(console.error);
+                                    }).catch(console.error);
+                                } else {
+                                    messageToSend = `It appears the picture was not downloaded properly please send the picture again`;
+                                    messageChain.delete(no);
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                                    }).catch(console.error)
+                                }
+
 
 
 
 
                             } else if (messages[0].substring(messages[0].indexOf('@') + 1, messages[0].length) === "portfolio" && messages[0].includes("@portfolio")) {
-                                if (attachmentData.data.length > 0) {
-                                    messageToSend = "Thank you for sending your picture, please type a bried description about the picture, here you could include what is in the picture, and/or the prices and/or the quality of work done, and how long it took you to have it done";
+                                messages.push(attachmentData.data);
+                                messageChain.set(no, messages);
+                                if (msg.hasMedia) {
+                                    messageToSend = "Thank you for sending your picture, please type a very brief description about the picture, here you could include what is in the picture, and/or the prices and/or the quality of work done, and how long it took you to have it done";
                                 } else {
-                                    messageToSend = "It appears you did not send a picture, please ensure that you send a picture, the best of what you have, because this helps you get clients, if this is not what you want to do you can type # to restart";
+                                    messageToSend = "It appears you did not send a picture or your picture was not download, please send again, the best of what you have, because this helps you get clients, if this is not what you want to do you can type # to restart";
                                 }
                                 client.sendMessage(msg.from, messageToSend).then((res) => {
 
@@ -537,7 +565,7 @@ client.on('message', async msg => {
                                 let newReview = new reviewsModel({
                                     review: query,
                                     name: businessName,
-                                    stars: messages[2],
+                                    stars: parseInt(messages[1]),
                                     reviewer_no: no,
                                 });
 
@@ -557,10 +585,10 @@ client.on('message', async msg => {
                                 //TODO Add file to firebase
                                 let businessName = messages[0].substring(0, messages[0].indexOf('@'));
 
-                                return firebase.addImage(businessName, attachmentData.data.split(',')[1], "pic").then((imageUrl) => {
+                                return firebase.addImage(businessName, messages[1], invoice.toString()).then((imageUrl) => {
 
                                     if (imageUrl === null) {
-                                        messageToSend = `There was an error adding your portfolio picture please try again, if the problem persists try again later, https://263713020524?text=${businessName}@pic`;
+                                        messageToSend = `There was an error adding your portfolio picture please try again, if the problem persists try again later, https://wa.me/${gigzBot}?text=${businessName}@pic`;
                                         messageChain.delete(no);
                                         client.sendMessage(msg.from, messageToSend).then((res) => {
 
@@ -575,7 +603,7 @@ client.on('message', async msg => {
                                         })
                                         return mongoWorker.addPortfolio(portfolio).then((r) => {
                                             //TODO check is was added successfully
-                                            messageToSend = `Your image was added to your portfolio successfully, you can add more, we encourage you to do so, by clicking https://263713020524?text=${businessName}@portfolio`;
+                                            messageToSend = `Your image was added to your portfolio successfully, you can add more, we encourage you to do so, by clicking https://wa.me/${gigzBot}?text=${businessName}@portfolio`;
                                             messageChain.delete(no);
                                             client.sendMessage(msg.from, messageToSend).then((res) => {
 
@@ -657,14 +685,14 @@ client.on('message', async msg => {
                                     if (r.length > 0) {
                                         messageToSend += "Available service providers right now\n\n";
                                         r.forEach((el) => {
-                                            messageToSend += `_Name_: *${el.name}* \n_Services_: ${el.skills} \n_See Profile_:  https://wa.me/263713020524?text=${el.id}@profile \n_Contact_: https://wa.me/${el.no.substring(0, el.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Gigz+I+am+interested+in+your+services \n\n`;
+                                            messageToSend += `_Name_: *${el.name}* \n_Services_: ${el.skills} \n_See Profile_:  https://wa.me/263713020524?text=${el.id}@profile \n_Chatbot(Virtual Assistant)_:https://wa.me/${gigzBot}?text=${el.name}@va \n_Contact_: https://wa.me/${el.no.substring(0, el.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Gigz+I+am+interested+in+your+services \n\n`;
                                             seenProfiles.push(el);
                                         });
                                         seenProfilesMap.set(no, seenProfiles);
                                         messageToSend += "_________________END_________________\n";
                                         messageToSend += `Please select one of the option below \n1)To see the next service providers \n\nType # to restart`;
                                     } else {
-                                        messageToSend += `It appears there are no service providers that match your search at the moment, please try again tomorrow, or try searching using another term we have over 100 service providers already registered`;
+                                        messageToSend += `It appears there are no service providers that match your search at the moment, please try again tomorrow, or try searching using another term we have over 100 service providers already registered, \n\nYou can retry your search here`;
                                         messageChain.delete(no);
                                     }
 
@@ -673,9 +701,6 @@ client.on('message', async msg => {
                                     }).catch(console.error);
 
                                 }).catch(console.error);
-
-
-
 
                             } else if (messages[1] === "2" && messages[0] === "1073unashe") { // Check name and send categories
                                 mongoWorker.checkName(query.toLowerCase()).then((v) => {
@@ -754,7 +779,7 @@ client.on('message', async msg => {
                                         messageToSend += "_________________END_________________\n";
                                         messageToSend += `Please select one of the option below \n1)To see the next services providers \n\nType # to restart `;
                                     } else {
-                                        messageToSend += `It appears there are not any more service providers that match your search at the moment, please try again tomorrow, or try searching using another term we have over 100 service providers already registered`;
+                                        messageToSend += `It appears there are no service providers that match your search at the moment, please try again tomorrow, or try searching using another term we have over 100 service providers already registered, \n\nYou can retry your search here`;
                                         messageChain.delete(no);
                                     }
 
@@ -1326,7 +1351,7 @@ client.on('message', async msg => {
                                     if (package === "7.99") {
                                         website = `\nThe link to your web page is \nhttp://${messages[2]}.gigz.co.zw, you can use it to market your services, to add your picture use this link \nhttps://wa.me/${gigzBot}?text=${milliSecondsSinceEpoch}@pic , this picture will make your web page look even nicer, also use links above to add pictures of the work you've done, that helps you get clients`;
                                     }
-                                    messageToSend = `Account successfully saved, now we start marketing your services, \nFor anyone to use your Virtual Assistant or Chatbot they need to use this link \nhttps://wa.me/${gigzBot}?text=${messages[2].toLowerCase()}@va your name with @va added to it \nFor anyone to add recommendations for your services,(You should encorage your clients to do so because this helps you get more clients) this should use this link \nhttps://wa.me/${gigzBot}?text=${messages[2].toLowerCase()}@rate which is your name added @rate  \nIf you ever add more services you can add your service using this link \nhttps://wa.me/${gigzBot}?text=${messages[2]}@services \nTo add pictures of some of the work you have done use this link \nhttps://wa.me/${gigzBot}?text=${messages[2].toLowerCase()}@portfolio  ${website} \nCongratulations on getting started on Gigz, we look foward to working together,marketing your services and giving you tools to improve your operations and efficies`;
+                                    messageToSend = `Account successfully saved, now we start marketing your services, \nFor anyone to use your Virtual Assistant or Chatbot they need to use this link \nhttps://wa.me/${gigzBot}?text=${messages[2].toLowerCase()}@va your name with @va added to it \nFor anyone to add recommendations for your services,(You should encorage your clients to do so because this helps you get more clients) this should use this link \nhttps://wa.me/${gigzBot}?text=${messages[2].toLowerCase()}@rate which is your name added @rate  \nIf you ever add more services you can add your service using this link \nhttps://wa.me/${gigzBot}?text=addva \nTo add pictures of some of the work you have done use this link \nhttps://wa.me/${gigzBot}?text=${messages[2].toLowerCase()}@portfolio  ${website} \nCongratulations on getting started on Gigz, we look foward to working together,marketing your services and giving you tools to improve your operations and efficies`;
                                     client.sendMessage(msg.from, messageToSend).then((res) => {
                                         // console.log("Res " + JSON.stringify(res));
                                         messageChain.delete(no);

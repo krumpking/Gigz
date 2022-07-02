@@ -11,7 +11,7 @@ module.exports = {
         return worker.save();
     },
     getWorkerById: function (id) {
-        return Worker.find({
+        return Worker.findOne({
             id: id
         });
     },

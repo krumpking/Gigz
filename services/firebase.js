@@ -1,14 +1,37 @@
 
 var admin = require("firebase-admin");
-
+const uuid = require('uuid-v4');
 var serviceAccount = require("../serviceAccountKey.json");
+// Import the functions you need from the SDKs you need
+const { initializeApp } = require('firebase/app');
+const { getStorage, ref, getDownloadURL, uploadString } = require("firebase/storage");
+
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyALq4M9lKK5lUp8Sg5A_LfsycfzlKu8Goc",
+  authDomain: "chub-996fa.firebaseapp.com",
+  projectId: "chub-996fa",
+  storageBucket: "chub-996fa.appspot.com",
+  messagingSenderId: "942749215777",
+  appId: "1:942749215777:web:0d1007a0a7e165814d4760",
+  measurementId: "G-P10E0WRGYQ"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
 const db = admin.firestore();
-const storage = admin.storage();
+// Initialize Cloud Storage and get a reference to the service
+const storage = getStorage(app);
 
 
 
@@ -54,13 +77,17 @@ module.exports = {
 
   },
   addImage: async function (name, imageString, saveAs) {
-    var storageRef = firebase.storage().ref().child(`${name}/${saveAs}`);
+    const metadata = {
+      contentType: 'image/jpeg',
+    };
+
+    var storageRef = ref(storage, `${name}/${saveAs}`);
     let url = "";
     try {
-      url = await storageRef.getDownloadURL();
-      storageRef.putString(imageString, 'base64').then(function (snapshot) {
-        console.log('Uploaded a base64 string!');
-      });
+
+      await uploadString(storageRef, imageString, 'base64', metadata);
+
+      url = await getDownloadURL(storageRef);
 
       return url;
     } catch (e) {
