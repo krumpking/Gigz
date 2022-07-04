@@ -5,7 +5,7 @@ var ReviewSchema = new Schema({
     reviewer_no: { type: String, required: true },
     review: { type: String, required: true, index: "text" },
     stars: { type: Number, required: true },
-    name: { type: String, unique: true, required: true, dropDups: true },
+    name: { type: String, required: true},
     date: { type: Date },
 });
 

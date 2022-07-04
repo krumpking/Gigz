@@ -97,6 +97,7 @@ const zwlPrice = 600;
 var pollUrl = "";
 var seenProfilesMap = new Map();
 var clientMap = new Map();
+var pdfMap = new Map();
 var attachmentData = {};
 const contactUs = "263719066282";
 const gigzBot = "263713020524";
@@ -307,7 +308,6 @@ client.on('message', async msg => {
 
             if (messageChain.has(no)) { // check if user is already in communication
                 messages = messageChain.get(no);
-                console.log(messages);
                 switch (messages.length) { // looking to get the context of the current conversation
                     case 1:
                         if (messages.length > 2) {
@@ -343,7 +343,8 @@ client.on('message', async msg => {
                                     if (v.package === "7.99") {
                                         website = `${v.name}.gigz.co.zw`;
                                     }
-                                    messageToSend = `Name: ${v.name} \nBrief Intro:${v.brief} \nServices: ${v.skills} \nAreas able to serve: ${v.areas} \nTo see their reviews click \nhttps://wa.me/263713020524?text=${v.name}@reviews \nTo chat to their virtual assistant click \nhttps://wa.me/263713020524?text=${v.name}@va   ${website} \n_Contact_: https://wa.me/${el.no.substring(0, el.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Gigz+I+am+interested+in+your+services`;
+                                    messageToSend = `Name: ${v.name} \nBrief Intro:${v.brief} \nServices: ${v.skills} \nAreas able to serve: ${v.areas} \nTo chat to their virtual assistant click \nhttps://wa.me/263713020524?text=${v.name}@va   ${website} \n_Contact_: https://wa.me/${v.no.substring(0, v.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Gigz+I+am+interested+in+your+services`;
+                                    messageChain.delete(no);
                                 } else if (query === "2") { // Services 
                                     messages.push(query);
                                     messageChain.set(no, messages);
@@ -351,10 +352,10 @@ client.on('message', async msg => {
                                     messageToSend = `${name}'s Services and costs \n\n`;
                                     for (let index = 0; index < servicesPrices.length; index++) {
                                         const element = servicesPrices[index];
-                                        messageToSend += `${index + 1} ${element.substring(0, element.indexOf("="))}  ${element.substring(element.indexOf("=") + 1, element.length)}}\n\n`;
+                                        messageToSend += `${index + 1} ${element.substring(0, element.indexOf("="))}  ${element.substring(element.indexOf("=") + 1, element.length)}\n\n`;
                                     }
-                                    messageToSend += `____________END___________`;
-                                    messageToSend += `Select one of the options below  \n*1* Create a quotation \n*2* See work done before  \n*3* To see reviews \n_Contact_: https://wa.me/${el.no.substring(0, el.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Gigz+I+am+interested+in+your+services`;
+                                    messageToSend += `____________END___________\n`;
+                                    messageToSend += `Select one of the options below  \n*1* Create a quotation \n*2* See work done before  \n*3* To see reviews \n_Contact_: https://wa.me/${v.no.substring(0, v.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Gigz+I+am+interested+in+your+services`;
                                 } else if (query === "3") { // FAQs
                                     messages.push(query);
                                     messageChain.set(no, messages);
@@ -364,8 +365,8 @@ client.on('message', async msg => {
                                         const element = servicesFAQS[index];
                                         messageToSend += `*${index + 1}* ${element.substring(0, element.indexOf("="))}\n\n`;
                                     }
-                                    messageToSend += `____________END___________`;
-                                    messageToSend += `Send the question you are looking an answer for by the sending the number on the left of it e.g 1 \n_Contact_: https://wa.me/${el.no.substring(0, el.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Gigz+I+am+interested+in+your+services`;
+                                    messageToSend += `____________END___________\n`;
+                                    messageToSend += `Send the question you are looking an answer for by the sending the number on the left of it e.g 1 \n_Contact_: https://wa.me/${v.no.substring(0, v.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Gigz+I+am+interested+in+your+services`;
                                 } else {
                                     messageToSend = "This response is out of the expected one, please select one of the options 1 or 2 or 3 , if this is not what you type # to restart";
                                 }
@@ -618,7 +619,6 @@ client.on('message', async msg => {
                             } else if (messages[0].substring(messages[0].indexOf("@"), messages[0].length).toLowerCase() === "@va" && messages[0].includes("@va")) {
                                 let v = clientMap.get(no); // get the business's profile saved in the map
                                 if (messages[1] === "2") { // Confirm this is option for services
-
                                     if (query === "1") { // Confirm items for Quotation
                                         messages.push(query);
                                         messageChain.set(no, messages);
@@ -626,28 +626,37 @@ client.on('message', async msg => {
                                         messageToSend = `Here are ${name}'s Services and costs again for you to choose \n\n`;
                                         for (let index = 0; index < servicesPrices.length; index++) {
                                             const element = servicesPrices[index];
-                                            messageToSend += `${index + 1} ${element.substring(0, element.indexOf("="))}  ${element.substring(element.indexOf("=") + 1, element.length)}}\n\n`;
+                                            messageToSend += `${index + 1} ${element.substring(0, element.indexOf("="))}  ${element.substring(element.indexOf("=") + 1, element.length)}\n\n`;
                                         }
-                                        messageToSend += `____________END___________`;
+                                        messageToSend += `____________END___________\n`;
                                         messageToSend += `Type the number of each of the services you want separated by a comma(for any service you need more than once you can just type it as many times as you need it)  and send e.g 1,2,2,3  for services 1 and 2(this service is required twice) and 3 \nOR \n1,1,1,2,3 for services 1(this service is required thrice) and 4 and 6 `;
-                                    } if (query === "2") { // Portfolio
-                                        mongoWorker.getPortfolio(v.name).then((r) => {
+                                        client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                                        }).catch(console.error);
+                                    } else if (query === "2") { // Portfolio
+                                        return mongoWorker.getPortfolio(v.name).then((r) => {
                                             r.forEach(element => {
-                                                client.sendMessage(msg.from, element.imageUrl, { caption: element.description }).catch(console.error);
+                                                let options = {
+                                                    unsafeMime: true,
+                                                }
+                                                return MessageMedia.fromUrl(element.imageUrl, options).then((media) => {
+                                                    client.sendMessage(msg.from, media, { caption: element.description }).catch(console.error);
+                                                }).catch(console.error);
+
                                             });
 
                                         }).catch(console.error);
 
-                                    } if (query === "3") { // See reviews
+                                    } else if (query === "3") { // See reviews
 
                                         mongoWorker.getWorkerReviews(v.name).then((r) => {
 
                                             if (r.length > 0) {
-                                                messageToSend += `These are ratings the last 7 reviews this ${v.name} has had\n\n`;
-                                                v.forEach((e) => {
-                                                    messageToSend += `_Raing_:${e.stars}\n${e.review} \n\n`;
+                                                messageToSend += `These are last 7 reviews ${v.name} has had\n\n`;
+                                                r.forEach((e) => {
+                                                    messageToSend += `_Rating_:${e.stars}\n${e.review} \n\n`;
                                                 });
-                                                messageToSend += `________________END_______________________`;
+                                                messageToSend += `________________END___________________\n`;
                                             } else {
                                                 messageToSend += `${v.name} does not have any reviews yet`;
                                             }
@@ -666,17 +675,26 @@ client.on('message', async msg => {
 
                                         });
                                     } else { // outside of the options
+
                                         messageToSend = `It appears you did not select one of the available options, please select option 1 or 2 or 3`;
+                                        client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                                        }).catch(console.error);
                                     }
                                 } else if (messages[1] === "3") { // FAQs answers
                                     let answers = v.faqs.split(",");
                                     messageToSend = `Answer \n${answers[parseInt(query) - 1].substring(answers[parseInt(query) - 1].indexOf("=") + 1, answers[parseInt(query) - 1].length)}  \n\nYou can select another number to get an answer to another question, or type # to restart`;
-                                } else { // Selected option outside of those provided
-                                    messageToSend = `It appears you did not select one of the available options, please select option 1 or 2 or 3`;
-                                }
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
 
-                                }).catch(console.error);
+                                    }).catch(console.error);
+                                } else { // Selected option outside of those provided
+
+                                    messageToSend = `It appears you did not select one of the available options, please select option 1 or 2 or 3`;
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                                    }).catch(console.error);
+                                }
+
                             } else if (messages[1] === "1" && messages[0] === "1073unashe") { // Search
 
                                 var seenProfiles = [];
@@ -890,29 +908,32 @@ client.on('message', async msg => {
                             }
                         } else if (messages[0].substring(messages[0].indexOf("@"), messages[0].length).toLowerCase() === "@va" && messages[0].includes("@va")) {
                             let v = clientMap.get(no); // get the business's profile saved in the map
+
                             if (messages[1] === "2") {  // Confirm this is option for services
 
 
                                 if (messages[2] === "1") { // Confirm this is option for create quotation
 
-                                    if (query.split(",") > 0) { // Ensure query typed in properly
+                                    if (query.split(",").length > 0) { // Ensure query typed in properly
                                         messages.push(query);
                                         messageChain.set(no, messages);
                                         let chosenServices = query.split(",");
                                         let allServices = v.prices.split(",");
-                                        messageToSend = `Services you chose \n\n`;
+                                        messageToSend = `These are the services you chose \n\n`;
                                         for (let index = 0; index < chosenServices.length; index++) {
-                                            const element = chosenServices[index];
-                                            messageToSend += `${allServices[element].substring(0, allServices.indexOf("="))}  ${allServices.substring(allServices.indexOf("=") + 1, allServices.length)}}\n\n`;
+                                            const element = chosenServices[index] - 1;
+                                            if (element < allServices.length) { // Only available services show
+                                                messageToSend += `${allServices[element].substring(0, allServices[element].indexOf("="))}  ${allServices[element].substring(allServices[element].indexOf("=") + 1, allServices[element].length)}\n\n`;
+                                            }
                                         }
-                                        messageToSend += `____________END___________`;
-                                        messageToSend += `Please confirm these are the services you wanted and send \n*1* Yes, these are the services I want *2* No, let me resend the services I want`;
+                                        messageToSend += `____________END___________\n`;
+                                        messageToSend += `Please confirm these are the services you wanted and send \n*1* Yes, these are the services I want \n*2* No, let me resend the services I want`;
                                     } else { // Quotation query not typed properly
                                         messageToSend += `It appears you did not type in the services you want properly, please try again, if this is not what you want, type # and send to restart`;
                                     }
 
                                 } else {
-
+                                    messageToSend += `${allServices[element].substring(0, allServices[element].indexOf("="))}  ${allServices[element].substring(allServices[element].indexOf("=") + 1, allServices[element].length)}\n\n`;
                                 }
 
                             } else { // outside of expected responses
@@ -946,6 +967,8 @@ client.on('message', async msg => {
                                 // console.log("Res " + JSON.stringify(res));
                             }).catch(console.error);
                         }
+
+
                         break;
                     case 4:
                         if (messages[1] === "2" && messages[0] === "1073unashe") { // Registering , brief
@@ -967,7 +990,7 @@ client.on('message', async msg => {
                                         let v = clientMap.get(no);
                                         // Generate PDF
                                         messages.push(query);
-
+                                        messageChain.set(no, messages);
                                         let chosenServices = messages[3].split(",");
                                         let allServices = v.prices.split(",");
                                         var quotation = {};
@@ -976,36 +999,43 @@ client.on('message', async msg => {
                                         quotation.name = v.name;
                                         quotation.memo = `Quotation for ${v.name} generated via Gigz`;
                                         quotation.qNumber = invoice;
-                                        messages.push(invoice); // invoice put on messages[5]
-                                        messageChain.set(no, messages);
+                                        pdfMap.set(no, invoice); // invoice put on messages[5]
+
                                         quotation.dueDate = `${new Date().getMonth() + 1}/${new Date().getDate()}/${new Date().getFullYear()}`
                                         let servicesOnQ = [];
                                         let subtotal = 0;
                                         for (let index = 0; index < chosenServices.length; index++) {
-                                            const element = chosenServices[index];
-                                            servicesOnQ.push({
-                                                itemCode: element,
-                                                description: allServices[element].substring(0, allServices.indexOf("=")),
-                                                // quantity: 2,
-                                                price: allServices.substring(allServices.indexOf("=") + 1, allServices.length),
-                                                amount: allServices.substring(allServices.indexOf("=") + 1, allServices.length)
-                                            });
+                                            const element = chosenServices[index] - 1;
+                                            if (element < allServices.length) {
+                                                servicesOnQ.push({
+                                                    itemCode: element + 1,
+                                                    description: allServices[element].substring(0, allServices[element].indexOf("=")),
+                                                    // quantity: 2,
+                                                    price: allServices[element].substring(allServices[element].indexOf("=") + 1, allServices[element].length),
+                                                    amount: allServices[element].substring(allServices[element].indexOf("=") + 1, allServices[element].length)
+                                                });
+                                                subtotal += parseInt(allServices[element].substring(allServices[element].indexOf("=") + 1, allServices[element].length));
+                                            }
+
                                         }
                                         quotation.items = servicesOnQ;
                                         quotation.subtotal = subtotal;
                                         const qg = new QGenerator(quotation);
                                         qg.generate();
                                         messageToSend = `PDF generated please select one of the options  \n*1* Send it now \n*2* I change my mind delete it \nSend the number of the option you want e.g Send 1 to get the generated Quotation`;
+
                                     } else if (query === "2") { // Quotation was wrong lets try again
-                                        messageChain.set(no, messages.pop());
-                                        let servicesPrices = query.split(",");
-                                        messageToSend = `Okay let us do this again \n\n`;
-                                        for (let index = 0; index < servicesPrices.length; index++) {
-                                            const element = servicesPrices[index];
-                                            messageToSend += `${index + 1} ${element.substring(0, element.indexOf("="))}  ${element.substring(element.indexOf("=") + 1, element.length)}}\n\n`;
-                                        }
-                                        messageToSend += `____________END___________`;
-                                        messageToSend += `Type the number of each of the services you want separated by a comma(if you want more than one of the same service, you can list it as many times as you want it)  and send e.g 1,2,3  for services 1 and 2 and 3 \nOR \n2,4,6 for services 2 and 4 and 6 `;
+                                        messageChain.delete(no);
+                                        messageToSend = `The chat has restarted, you can click on this link to talk to this Chatbot https://wa.me/${gigzBot}?text=${messages[0]}`;
+                                        // messageChain.set(no, messages.pop());
+                                        // let servicesPrices = query.split(",");
+                                        // messageToSend = `Okay let us do this again \n\n`;
+                                        // for (let index = 0; index < servicesPrices.length; index++) {
+                                        //     const element = servicesPrices[index];
+                                        //     messageToSend += `${index + 1} ${element.substring(0, element.indexOf("="))}  ${element.substring(element.indexOf("=") + 1, element.length)}}\n\n`;
+                                        // }
+                                        // messageToSend += `____________END___________\n`;
+                                        // messageToSend += `Type the number of each of the services you want separated by a comma(if you want more than one of the same service, you can list it as many times as you want it)  and send e.g 1,2,3  for services 1 and 2 and 3 \nOR \n2,4,6 for services 2 and 4 and 6 `;
                                     } else {
                                         messageToSend = `It appears you did not select one of the available options, please select option 1 or 2 `;
                                     }
@@ -1076,33 +1106,33 @@ client.on('message', async msg => {
 
 
                                 if (messages[2] === "1") { // confirm its create a quotation
+                                    let v = clientMap.get(no);
+                                    messages.push(query);
+                                    messageChain.set(no, messages);
 
+                                    let filePath = `./${v.name} quotation ${pdfMap.get(no)}.pdf`;
 
-                                    if (messages[2] === "1") { // Yes these are the services I want
-                                        let filePath = `./${v.name} quotation ${messages[5]}.pdf`;
-                                        if (messages[4] === "1") { // Yes send now
-                                            let mediaMessage = `${v.name} quotation ${messages[5]}`;
-                                            const media = MessageMedia.fromFilePath(filePath);
+                                    if (messages[4] === "1") { // Yes send now
+                                        let mediaMessage = `${v.name} quotation ${pdfMap.get(no)}`;
+                                        const media = MessageMedia.fromFilePath(filePath);
 
-                                            client.sendMessage(no, media, { caption: mediaMessage }).catch(console.error);
-                                        } else if (messages[4] === "2") { // No delete
-                                            fs.unlink(filePath, (err) => {
-                                                if (err) {
-                                                    console.error(err)
-                                                    return
-                                                }
+                                        client.sendMessage(no, media, { caption: mediaMessage }).catch(console.error);
+                                    } else if (messages[4] === "2") { // No delete
+                                        fs.unlink(filePath, (err) => {
+                                            if (err) {
+                                                console.error(err)
+                                                return
+                                            }
 
-                                                //file removed
+                                            //file removed
 
-                                            });
-                                            messageToSend = "Thank you, the file is being deleted";
-                                        } else {
-                                            messageToSend = "Please select one of the options 1 or 2, e.g send 1 to get the generated pdf";
-                                        }
+                                        });
+                                        messageToSend = "Thank you, the file is being deleted";
                                     } else {
-                                        messageToSend = "This response is out of the expected one, this chat has been restarted, send hi to choose the option you want";
-
+                                        messageToSend = "Please select one of the options 1 or 2, e.g send 1 to get the generated pdf";
                                     }
+                                    messageChain.delete(no);
+
                                 } else {
                                     messageToSend = "This response is out of the expected one, this chat has been restarted, send hi to choose the option you want";
 

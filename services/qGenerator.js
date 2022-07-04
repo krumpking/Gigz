@@ -17,7 +17,7 @@ class QGenerator {
             .fontSize(10)
             .text(`Quotation Number: ${this.q.qNumber}`, { align: 'right' })
             .text(`Due: ${this.q.dueDate}`, { align: 'right' })
-            .text(`Balance Due: $${this.q.subtotal - this.q.paid}`, { align: 'right' })
+            .text(`Balance Due: $${this.q.subtotal}`, { align: 'right' })
             .moveDown();
         // .text(`Billing Address:\n ${billingAddress.name}\n${billingAddress.address}\n${billingAddress.city}\n${billingAddress.state},${billingAddress.country}, ${billingAddress.postalCode}`, { align: 'right' })
 
@@ -68,24 +68,16 @@ class QGenerator {
                 .text(`$ ${item.price}`, priceX, y)
                 .text(`$ ${item.amount}`, amountX, y)
         }
+        doc
+            .fontSize(10)
+            .text("Total", priceX, tableTop + 25 + (items.length * 25))
+            .text(`$ ${this.q.subtotal}`, amountX, tableTop + 25 + (items.length * 25))
+
+
     }
 
     generateFooter(doc) {
 
-        const tableTop = 270
-        const itemCodeX = 50
-        const descriptionX = 100
-        const quantityX = 250
-        const priceX = 300
-        const amountX = 350
-
-        doc
-            .fontSize(10)
-            .text(``, itemCodeX, y)
-            .text(``, descriptionX, y)
-            // .text(item.quantity, quantityX, y)
-            .text(``, priceX, y)
-            .text(`Total`, this.q.subtotal, y, { bold: true })
 
         doc
             .fontSize(10)
