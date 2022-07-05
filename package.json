@@ -37,6 +37,6 @@
     "twitter": "^1.7.1",
     "uuid-v4": "^0.1.0",
     "valid-url": "^1.0.9",
-    "whatsapp-web.js": "^1.16.6"
+    "whatsapp-web.js": "^1.17.0"
   }
 }

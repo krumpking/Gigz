@@ -26,7 +26,7 @@ initConnection();
 
 
 process.title = "whatsapp-node-api";
-global.client = new Client({ qrTimeoutMs: 0, puppeteer: { headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--unhandled-rejections=strict'] } });
+const client = new Client({ qrTimeoutMs: 0, puppeteer: { headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--unhandled-rejections=strict'] } });
 ///
 global.authed = false;
 const app = express();
@@ -72,13 +72,16 @@ client.on('auth_failure', () => {
 
 
 
-
-
-var sentMessages = 0;
-
-
 client.on('ready', async () => {
     console.log('Gigz is running!');
+    // try {
+    //     const chats = await client.getChats();
+    //     chats.forEach((elem) => {
+    //         client.sendMessage(elem.id._serialized, `Good Morning we are excited to announce that we have upgraded our system, to make it even more useful to you, \n\nIf you are searching for a service provider e.g an agent for rental propertly our search feature will easily connect you to them while their chatbot can help you get updates on their available property, any other service provider it is the same, our search feature makes it super easy, or you can go on our website http://www.gigz.co.zw to use a more familiar search engine, \nYou can search and get all service providers you want for FREE \n\nFor our service providers who had signed up we, we are introducing a new and exciting solution for you, for only 7.99USD p.m(Paid via Ecocash) you get a profile of our system, visibility on our search engine with its unique click funnel for service providers, a website with your name in the url an example is http://unashe.gigz.co.zw  with SEO,Marketing Analytics, with community efforts on SERP(no need to spend over ~100USD~ to get a website done, when you can get it within minutes) and a chatbot(Virtual Assistant running on top of our system,NO MORE ~120USDplus over 40USD in monthly payments~) because you believe in us first, if you REGISTER, between today and tomorrow you get the first month FREE, and join our community of service providers ,begin getting clients and improving the effeciencies in running your service business all managed via Whatsapp`);
+    //     });
+    // } catch (error) {
+    //     console.error(error);
+    // }
 
 
 });
@@ -152,6 +155,8 @@ client.on('message', async msg => {
     var messages = [];
 
 
+
+
     if (msg.from.length < 23 && msg.from.includes("@c")) {
 
 
@@ -222,7 +227,7 @@ client.on('message', async msg => {
             messageChain.delete(no); //Ensure all previous messages are deleted
             messages.push(query);
             messageChain.set(no, messages);
-            messageToSend = "Please select the package you would like to subscribe to \n\n \n*1* Silver package for 5.99USD p.m only (Profile and Virtual Assistant) \n*2* Gold Package 7.99USD p.m (Profile , Virtual Assistant and Web page)  \n*3* Platinum Package (Custom solution to improve your services)  \n\nTo choose any option send a number eng. 2 to get pay for a Profile, Virtual Assistant and a Web page \n\nTerms and Conditions Apply, to see them send Terms or click this link https://wa.me/263713020524?text=terms";
+            messageToSend = "Please select the package you would like to subscribe to \n\n \n*1* Gold Package 7.99USD p.m (Profile , Virtual Assistant and Web page)  \n*2* Platinum Package (Custom solution to improve your services)  \n\nTo choose any option send a number eng. 1 to get pay for a Profile, Virtual Assistant and a Web page \n\nTerms and Conditions Apply, to see them send Terms or click this link https://wa.me/263713020524?text=terms";
 
             client.sendMessage(msg.from, messageToSend).then((res) => {
                 // console.log("Res " + JSON.stringify(res));
@@ -319,7 +324,7 @@ client.on('message', async msg => {
                         } else {
                             if (messages[0] === "subscribe") { // Subscribe 
 
-                                if (query === "3") { // Custom software package
+                                if (query === "2") { // Custom software package
                                     messageToSend = "Please send click this link https://wa.me/263719066282?text=Hi+Gigz+I+want+a+custom+software+solution+for+my+business";
 
                                     client.sendMessage(msg.from, messageToSend).then((res) => {
@@ -339,17 +344,14 @@ client.on('message', async msg => {
 
                                 let v = clientMap.get(no);
                                 if (query === "1") { // About
-                                    let website = "";
-                                    if (v.package === "7.99") {
-                                        website = `${v.name}.gigz.co.zw`;
-                                    }
+                                    let website = `${v.name}.gigz.co.zw`;
                                     messageToSend = `Name: ${v.name} \nBrief Intro:${v.brief} \nServices: ${v.skills} \nAreas able to serve: ${v.areas} \nTo chat to their virtual assistant click \nhttps://wa.me/263713020524?text=${v.name}@va   ${website} \n_Contact_: https://wa.me/${v.no.substring(0, v.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Gigz+I+am+interested+in+your+services`;
                                     messageChain.delete(no);
                                 } else if (query === "2") { // Services 
                                     messages.push(query);
                                     messageChain.set(no, messages);
                                     let servicesPrices = v.prices.split(",");
-                                    messageToSend = `${name}'s Services and costs \n\n`;
+                                    messageToSend = `${v.name}'s Services and costs \n\n`;
                                     for (let index = 0; index < servicesPrices.length; index++) {
                                         const element = servicesPrices[index];
                                         messageToSend += `${index + 1} ${element.substring(0, element.indexOf("="))}  ${element.substring(element.indexOf("=") + 1, element.length)}\n\n`;
@@ -441,20 +443,20 @@ client.on('message', async msg => {
                                 }).catch((console.error));
                             } else if (query === "2" && messages[0] === "1073unashe") {
 
-                                checkPayment(no).then((v) => {
-                                    if (v.expired) {
-                                        messageToSend = "It appears you are yet to subscribe, please type subscribe or click this link https://wa.me/263713020524?text=subscribe";
-                                    } else {
-                                        var clientArr = [v.package];
-                                        clientMap.set(no, clientArr);
-                                        messages.push(query);
-                                        messageChain.set(no, messages);
-                                        messageToSend += `Please answer the next few questions, you will only be asked once, they help to market your services, so be honest and take them seriously \nPlease tell us your full name or the name of your business (this has to be unique, if it was already taken you will be asked again), \n\nIf this is not what you want type # to restart`;
-                                    }
-                                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                                        // console.log("Res " + JSON.stringify(res));
-                                    }).catch((console.error));
-                                })
+                                // checkPayment(no).then((v) => {
+                                //     if (v.expired) {
+                                //         messageToSend = "It appears you are yet to subscribe, please type subscribe or click this link https://wa.me/263713020524?text=subscribe";
+                                //     } else {
+                                //         var clientArr = [v.package];
+                                //         clientMap.set(no, clientArr);
+                                messages.push(query);
+                                messageChain.set(no, messages);
+                                messageToSend += `FREE first month for all who register between Tue 5 July and 6 July \n\nPlease answer the next few questions, you will only be asked once, they help to market your services, so be honest and take them seriously \nPlease tell us your full name or the name of your business (this has to be unique, if it was already taken you will be asked again), \n\nIf this is not what you want type # to restart`;
+                                // }
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                    // console.log("Res " + JSON.stringify(res));
+                                }).catch((console.error));
+                                // })
 
                             } else if (query === "3" && messages[0] === "1073unashe") { // How does this work option?
                                 messages.push(query);
@@ -623,7 +625,7 @@ client.on('message', async msg => {
                                         messages.push(query);
                                         messageChain.set(no, messages);
                                         let servicesPrices = v.prices.split(",");
-                                        messageToSend = `Here are ${name}'s Services and costs again for you to choose \n\n`;
+                                        messageToSend = `Here are ${v.name}'s Services and costs again for you to choose \n\n`;
                                         for (let index = 0; index < servicesPrices.length; index++) {
                                             const element = servicesPrices[index];
                                             messageToSend += `${index + 1} ${element.substring(0, element.indexOf("="))}  ${element.substring(element.indexOf("=") + 1, element.length)}\n\n`;
@@ -1153,7 +1155,7 @@ client.on('message', async msg => {
                         if (messages[1] === "2" && messages[0] === "1073unashe") { // Registering finishing profile now VA
                             messages.push(query);
                             messageChain.set(no, messages);
-                            let milliSecondsSinceEpoch = new Date().valueOf().toString();
+                            // let milliSecondsSinceEpoch = new Date().valueOf().toString();
 
                             var category = "";
 
@@ -1253,7 +1255,7 @@ client.on('message', async msg => {
                                     break;
                             }
 
-                            let package = clientMap.get(no)[0];
+
 
 
                             var worker = new Worker({
@@ -1262,11 +1264,13 @@ client.on('message', async msg => {
                                 skills: messages[4],
                                 brief: messages[5],
                                 areas: messages[6],
-                                package: package,
+                                package: "7.99",
                                 expired: false,
                                 no: no,
                                 date: new Date(),
-                                id: milliSecondsSinceEpoch
+                                id: invoice,
+                                urlName: messages[2].toLowerCase().replace(/\s/g, ''),
+                                url: `http://${messages[2].toLowerCase().replace(/\s/g, '')}.gigz.co.zw`
                             });
 
 
@@ -1376,11 +1380,7 @@ client.on('message', async msg => {
                                 let prices = messages[7];
                                 let faqs = messages[9];
                                 mongoWorker.addVA(no, prices, faqs).then((v) => {
-                                    let website = "";
-                                    let package = clientMap.get(no)[0];
-                                    if (package === "7.99") {
-                                        website = `\nThe link to your web page is \nhttp://${messages[2]}.gigz.co.zw, you can use it to market your services, to add your picture use this link \nhttps://wa.me/${gigzBot}?text=${milliSecondsSinceEpoch}@pic , this picture will make your web page look even nicer, also use links above to add pictures of the work you've done, that helps you get clients`;
-                                    }
+                                    let website = `\nThe link to your web page is \nhttp://${messages[2].toLowerCase().replace(/\s/g, '')}.gigz.co.zw, you can use it to market your services, to add your picture use this link \nhttps://wa.me/${gigzBot}?text=${invoice}@pic , this picture will make your web page look even nicer, also use links above to add pictures of the work you've done, that helps you get clients`;
                                     messageToSend = `Account successfully saved, now we start marketing your services, \nFor anyone to use your Virtual Assistant or Chatbot they need to use this link \nhttps://wa.me/${gigzBot}?text=${messages[2].toLowerCase()}@va your name with @va added to it \nFor anyone to add recommendations for your services,(You should encorage your clients to do so because this helps you get more clients) this should use this link \nhttps://wa.me/${gigzBot}?text=${messages[2].toLowerCase()}@rate which is your name added @rate  \nIf you ever add more services you can add your service using this link \nhttps://wa.me/${gigzBot}?text=addva \nTo add pictures of some of the work you have done use this link \nhttps://wa.me/${gigzBot}?text=${messages[2].toLowerCase()}@portfolio  ${website} \nCongratulations on getting started on Gigz, we look foward to working together,marketing your services and giving you tools to improve your operations and efficies`;
                                     client.sendMessage(msg.from, messageToSend).then((res) => {
                                         // console.log("Res " + JSON.stringify(res));
@@ -1420,6 +1420,10 @@ client.on('message', async msg => {
                     default:
                         messageToSend = "This response is out of the expected one, this chat has been restarted, send hi to choose the option you want";
                         messageChain.delete(no);
+                        client.sendMessage(msg.from, messageToSend).then((res) => {
+                            // console.log("Res " + JSON.stringify(res));
+                            messageChain.delete(no);
+                        }).catch(console.error);
                         break;
                 }
 
@@ -1458,7 +1462,15 @@ client.on('message', async msg => {
 
 
 
+
+
 });
+
+
+
+
+
+
 
 // My useful functions
 
@@ -1490,6 +1502,9 @@ const isValidPhoneNumber = p => {
 client.on('status@broadcast', async status => {
     delete (status);
 });
+
+
+
 
 
 
@@ -1551,6 +1566,7 @@ app.post('/api/v1/checkpayments', async (req, res) => {
 
 
 });
+
 
 
 

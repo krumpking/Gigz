@@ -30,7 +30,6 @@ module.exports = {
     },
     unsubscribe: async function (no) {
         return Worker.deleteOne({ no: no });
-
     },
     updateWorkerProfile: async function (worker, no) {
         let newWorker = await Worker.findOne({ no: no });
@@ -52,10 +51,15 @@ module.exports = {
         return allWorkers;
     },
     getWorkers: function (searchString, number) {
-        return Worker.find({ $text: { $search: searchString }, expired: false }).skip(number).limit(7);
+        return Worker.find({
+            $or: [
+                { $text: { $search: searchString } },
+                { services: { $regex: '^' + searchString } }
+            ]
+        }).where({ expired: false }).skip(number).limit(7);
     },
     checkName: function (name) {
-        return Worker.findOne({ name: name });
+        return Worker.findOne({ urlName: name.toLowerCase().replace(/\s/g, '') });
     },
     addPortfolio: function (portfolio) {
         return portfolio.save();

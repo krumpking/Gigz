@@ -11,6 +11,8 @@ var WorkerSchema = new Schema({
     expired: { type: Boolean, required: true },
     prices: { type: String },
     faqs: { type: String },
+    url: { type: String },
+    urlName: { type: String },
     package: { type: String, required: true },
     date: { type: Date, required: true },
     id: { type: String, unique: true, required: true, dropDups: true },
