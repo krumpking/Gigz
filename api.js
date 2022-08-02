@@ -745,12 +745,9 @@ client.on('message', async msg => {
                     messageToSend = `How would you like to see your stock report, \n\n*1* Pdf format(Looks better this way) \n*2* As a normal message`;
                     var stock = {};
 
-                    // quotation.addresses.billing.number = no.substring(0, no.indexOf("@c.us"));
                     var uniqueID = new Date().getTime().toString();
                     stock.name = `stock ${uniqueID}`;
-                    // quotation.memo = `Quotation for ${v.name} generated via Hive`;
-                    // quotation.qNumber = invoice;
-                    pdfMap.set(no, uniqueID); // invoice put on messages[5]
+                    pdfMap.set(no, uniqueID);
 
                     stock.dueDate = `${new Date().getMonth() + 1}/${new Date().getDate()}/${new Date().getFullYear()}`;
                     let stockItems = [];
