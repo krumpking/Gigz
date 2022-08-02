@@ -1,7 +1,7 @@
 var Worker = require('../models/workerModel');
-var Review = require('../models/reviewsModel');
+var Reviews = require('../models/reviewsModel');
 var Worker = require('../models/workerModel');
-const portfolioModel = require('../models/portfolioModel');
+const WorkDone = require('../models/workdoneModel');
 
 module.exports = {
     getWorker: function (no) {
@@ -16,29 +16,23 @@ module.exports = {
         });
     },
     getWorkerReviews: function (name) {
-        return Review.find({
-            name: name
+        let search = name.toLowerCase().replace(/\s/g, '');
+        return Reviews.find({
+            urlName: search
         }).limit(7);
     },
     addReview: async function (review) {
-        var rvw = await Review.findOne({ reviewer_no: review.reviewer_no });
-        if (rvw === null) {
-            return review.save();
-        } else {
-            return null;
-        }
+
+        return review.save();
+
     },
     unsubscribe: async function (no) {
         return Worker.deleteOne({ no: no });
     },
     updateWorkerProfile: async function (worker, no) {
-        let newWorker = await Worker.findOne({ no: no });
-        newWorker.name = worker.name;
-        newWorker.category = worker.category;
-        newWorker.skills = worker.skills;
-        newWorker.brief = worker.brief;
-        newWorker.areas = worker.areas;
-        newWorker.save();
+        const filter = { no: no };
+        const update = { category: worker.category, skills: worker.skills, brief: worker.brief, areas: worker.areas };
+        return Worker.findOneAndUpdate(filter, update);
 
     },
     getClientsBySkillsCat: async function (gig) { // show be able to to ensure Gig are approved and are not after the finalDay 
@@ -50,19 +44,43 @@ module.exports = {
         }
         return allWorkers;
     },
-    getWorkers: function (searchString, number) {
-        return Worker.find({
-            $or: [
-                { $text: { $search: searchString } },
-                { services: { $regex: '^' + searchString } }
-            ]
-        }).where({ expired: false }).skip(number).limit(7);
+    getWorkers: async function (searchString, number) {
+        let results = await Worker.find({
+            $text: { $search: searchString },
+        }).sort({ score: { $meta: "textScore" } }).where({ expired: false }).skip(number).limit(7);
+        let primary = true;
+        if (!results.length > 0) {
+            results = await Worker.find({}).where({ expired: false }).skip(number).limit(7);
+            primary = false;
+        }
+        return {
+            primary: primary,
+            results: results,
+        }
+
+
+
+    },
+    addFaq: async (no, info) => {
+        let user = await Worker.findOne({ no, no });
+        let faqs = user.faqs + ";" + info;
+        let filter = { no: no };
+        let update = { faqs: faqs };
+        return Worker.findOneAndUpdate(filter, update);
+    },
+    addService: async (no, service) => {
+        let user = await Worker.findOne({ no, no });
+        let services = user.prices + ";" + info;
+        let filter = { no: no };
+        let update = { prices: services };
+        return Worker.findOneAndUpdate(filter, update);
     },
     checkName: function (name) {
-        return Worker.findOne({ urlName: name.toLowerCase().replace(/\s/g, '') });
+        let search = name.toLowerCase().replace(/\s/g, '');
+        return Worker.findOne({ urlName: search });
     },
-    addPortfolio: function (portfolio) {
-        return portfolio.save();
+    addPortfolio: function (workdone) {
+        return workdone.save();
     },
     addPicture: function (no, url) {
         const filter = { no: no };
@@ -71,14 +89,31 @@ module.exports = {
 
     },
     getPortfolio: function (name) {
-        return portfolioModel.find({
-            name: name,
+        let search = name.toLowerCase().replace(/\s/g, '');
+        return WorkDone.find({
+            urlName: search,
         })
     },
     addVA: async function (no, prices, faqs) {
         const filter = { no: no };
         const update = { prices: prices, faqs: faqs };
         return Worker.findOneAndUpdate(filter, update);
+    },
+    updateAllOther: async function (no) {
+        const filter = { no: no };
+        const update = { package: "0", expired: false };
+        return Worker.findOneAndUpdate(filter, update);
+    },
+    getAllWorkers: async function () {
+        return Worker.find({});
+    },
+    removeBids: async function (bids, no) {
+
+        let newAmount = bids - 1;
+        const filter = { no: no };
+        const update = { bids: parseInt(newAmount) };
+        return Worker.findOneAndUpdate(filter, update);
+
     }
 
 

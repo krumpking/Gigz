@@ -6,6 +6,7 @@ var WorkerSchema = new Schema({
     category: { type: String, required: true },
     skills: { type: String, required: true },
     brief: { type: String, required: true },
+    bids: { type: Number },
     no: { type: String, unique: true, required: true, dropDups: true },
     areas: { type: String, required: true },
     expired: { type: Boolean, required: true },

@@ -44,6 +44,8 @@ class QGenerator {
         const priceX = 300
         const amountX = 350
 
+
+
         doc
             .fontSize(10)
             .text('Item Code', itemCodeX, tableTop, { bold: true })

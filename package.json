@@ -1,5 +1,5 @@
 {
-  "name": "Gigz",
+  "name": "Hive",
   "version": "0.0.3",
   "description": "Whatsaapp bot",
   "main": "api.js",
@@ -13,7 +13,7 @@
     "whatsapp-web",
     "whatsapp"
   ],
-  "author": "Anele Siwawa",
+  "author": "Unashe Siwawa",
   "license": "MIT",
   "dependencies": {
     "axios": "^0.19.2",

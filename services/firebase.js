@@ -80,8 +80,8 @@ module.exports = {
     const metadata = {
       contentType: 'image/jpeg',
     };
-
-    var storageRef = ref(storage, `${name}/${saveAs}`);
+    let saveName = name.toLowerCase().replace(/\s/g, '');
+    var storageRef = ref(storage, `${saveName}/${saveAs}`);
     let url = "";
     try {
 

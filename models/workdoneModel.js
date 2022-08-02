@@ -1,8 +1,9 @@
 var mongoose = require('mongoose');
 var Schema = mongoose.Schema;
 
-var PortfolioSchema = new Schema({
+var WorkDone = new Schema({
     name: { type: String, required: true },
+    urlName: { type: String, required: true },
     no: { type: String, required: true },
     description: { type: String, required: true, index: "text" },
     imageUrl: { type: String, required: true },
@@ -12,4 +13,4 @@ var PortfolioSchema = new Schema({
 
 
 // Export model.
-module.exports = mongoose.model('Portfolio', PortfolioSchema, 'portfolio');	
+module.exports = mongoose.model('WorkDone', WorkDone, 'workdone');	
