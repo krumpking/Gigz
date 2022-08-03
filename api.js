@@ -410,6 +410,7 @@ client.on('message', async msg => {
     if (msg.from.length < 23 && msg.from.includes("@c")) {
 
 
+
         if (query.substring(query.indexOf("@"), query.length).toLowerCase() === "@va" && query.includes("@va") && query.substring(0, query.indexOf("@va")) !== "add") { // Virtual Assistant channel
             messageChain.delete(no);
             let businessName = query.toLowerCase().substring(0, query.toLowerCase().indexOf("@va"))
@@ -691,7 +692,13 @@ client.on('message', async msg => {
             messageChain.delete(no);
             mongoWorker.getWorker(no).then((v) => {
                 if (typeof v.urlName === "undefined" || v.expired) {
-                    messageToSend = `Only businesses can add services with prices `;
+
+                    if (v.expired) {
+                        messageToSend = `Your account expired, please renew to continue enjoying the full benefits https://wa.me/${hiveBot}?text=@subscribe`;
+                    } else {
+                        messageToSend = `Only businesses can add services with prices `;
+                    }
+
 
                 } else {
                     messages.push(query);
@@ -707,7 +714,13 @@ client.on('message', async msg => {
             messageChain.delete(no);
             mongoWorker.getWorker(no).then((v) => {
                 if (typeof v.urlName === "undefined" || v.expired) {
-                    messageToSend = `Only businesses can add frequently asked questions`;
+
+
+                    if (v.expired) {
+                        messageToSend = `Your account expired, please renew to continue enjoying the full benefits https://wa.me/${hiveBot}?text=@subscribe`;
+                    } else {
+                        messageToSend = `Only businesses can add frequently asked questions`;
+                    }
 
                 } else {
                     messages.push(query);
@@ -722,7 +735,12 @@ client.on('message', async msg => {
             messageChain.delete(no);
             mongoWorker.getWorker(no).then((v) => {
                 if (typeof v.urlName === "undefined" || v.expired) {
-                    messageToSend = `Only businesses can add stock`;
+
+                    if (v.expired) {
+                        messageToSend = `Your account expired, please renew to continue enjoying the full benefits https://wa.me/${hiveBot}?text=@subscribe`;
+                    } else {
+                        messageToSend = `Only businesses can add stock`;
+                    }
 
                 } else {
                     messages.push(query);
@@ -733,6 +751,7 @@ client.on('message', async msg => {
 
                 }).catch(console.error);
             }).catch(console.error);
+
 
         } else if (query.toLowerCase() === "@stock") { // View stock
             messageChain.delete(no);
@@ -776,6 +795,38 @@ client.on('message', async msg => {
 
                 }).catch(console.error);
             }).catch(console.error);
+        } else if (query.toLowerCase() === "@addstockmember") { // Add someone else to be able to see what is going on 
+            messageChain.delete(no);
+            stockService.seeAvailableStock(no).then((v) => {
+                if (v.length > 0) {
+                    clientMap.set(no, v);
+                    messages.push(query);
+                    messageChain.set(no, messages);
+                    messageToSend = `Please send the number of the person you want to add to be able to view the stock in the format 0712345678`;
+                } else {
+                    messageToSend = `It appears you have no stock available`;
+                }
+                client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                }).catch(console.error);
+            }).catch(console.error);
+        } else if (query.includes("@sold")) { // Confirm sold item keyword laptop@sold12
+            messageChain.delete(no);
+            let itemName = query.substring(0, query.indexOf("@sold"));
+            let numberOfItems = parseInt(query.substring(query.indexOf("@sold") + 5, query.length));
+            if (typeof parseInt(numberOfItems) === "number") {
+
+                stockService.removeFromAvailableStock(itemName, numberOfItems).then((r) => {
+                    console.log(r);
+                }).catch(console.error);
+
+            } else {
+                messageToSend = "The number of items sold are not clear, please use the format [item name]@sold[number of items sold] e.g laptop@sold11";
+                client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                }).catch(console.error);
+            }
+
         } else {
 
             if (messageChain.has(no)) { // check if user is already in communication
@@ -792,7 +843,7 @@ client.on('message', async msg => {
                             if (messages[0] === "@subscribe") { // @subscribe 
 
                                 if (query === "2") { // Custom software package
-                                    messageToSend = "Please send click this link https://wa.me/263719066282?text=Hi+Hive+I+want+a+custom+software+solution+for+my+business";
+                                    messageToSend = "Please send click this link https://wa.me/263772263139?text=Hi+Hive+I+want+a+custom+software+solution+for+my+business";
 
                                     client.sendMessage(msg.from, messageToSend).then((res) => {
                                         messageChain.delete(no);
@@ -1059,6 +1110,23 @@ client.on('message', async msg => {
 
                                     }).catch(console.error);
                                 }
+                            } else if (messages[0] === "@addstockmember") {
+                                if (isValidPhoneNumber(query)) {
+                                    let stock = clientMap.get(no);
+                                    let newMember = `263${query.substring(1, query.length)}@c.us`;
+                                    stockService.addMember(newMember, stock);
+                                    messageToSend = `Member added! `;
+                                    messageChain.delete(no);
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                                    }).catch(console.error);
+
+                                } else {
+                                    messageToSend = `Please enter a valid phonenumber, for this to work`;
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                                    }).catch(console.error);
+                                }
                             } else {
                                 messageToSend = "This response is out of the expected ones, please check the options above";
 
@@ -1129,7 +1197,7 @@ client.on('message', async msg => {
                                     });
 
                                 } else {
-                                    messageToSend = "It appears you did not enter a valid phone number, please check the number and send again";
+                                    messageToSend = "It appears you did not enter a valid phone number, please check the number and send again if this is not what you want, type # to restart";
                                     client.sendMessage(msg.from, messageToSend).then((res) => {
                                         // console.log("Res " + JSON.stringify(res));
                                     }).catch((console.error));
@@ -1709,8 +1777,8 @@ client.on('message', async msg => {
                                 messages.push(query);
                                 messageChain.set(no, messages);
                                 messageToSend = `Please confirm this is what you added: 
-                                                 \nItem:          ${messages[1]} 
-                                                 \nQuantity:      ${messages[2]} 
+                                                 \nItem:                ${messages[1]} 
+                                                 \nQuantity:         ${messages[2]} 
                                                  \nPrice per unit:${query}  
                                                  \n\nPlease select one of the options below \n*1* Yes, add it \n*2* No this is wrong, let's restart \n\nN.B Please take time to really make sure, because once added it can not be edited`;
                             } else {
@@ -2058,6 +2126,7 @@ client.on('message', async msg => {
                                     visibleName: messages[1],
                                     numberOfItems: parseInt(messages[2]),
                                     itemPrice: parseInt(messages[3]),
+                                    members: [],
                                     no: no
                                 });
 

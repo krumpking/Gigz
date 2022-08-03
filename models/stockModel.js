@@ -9,6 +9,7 @@ var StockModelSchema = new Schema({
     dayOfTheYear: { type: Number, required: true },
     date: { type: Date },
     no: { type: String, required: true },
+    members: { type: Array },
 });
 
 StockModelSchema.index({ itemName: 'text' });
