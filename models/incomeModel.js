@@ -2,11 +2,11 @@ var mongoose = require('mongoose');
 var Schema = mongoose.Schema;
 
 var IncomeSchema = new Schema({
-    no: no,
-    itemName: { type: Array, required: true },
-    itemPrice: { type: String, required: true },
-    date: { type: Date },
-    amount: { type: Number },
+    no: { type: String, required: true },
+    itemName: { type: String, required: true },
+    numberOfItems: { type: Number, required: true },
+    date: { type: Date, required: true },
+    amount: { type: Number, required: true },
 });
 
 IncomeSchema.index({ itemName: 'text' });

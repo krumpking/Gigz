@@ -816,8 +816,17 @@ client.on('message', async msg => {
             let numberOfItems = parseInt(query.substring(query.indexOf("@sold") + 5, query.length));
             if (typeof parseInt(numberOfItems) === "number") {
 
-                stockService.removeFromAvailableStock(itemName, numberOfItems).then((r) => {
-                    console.log(r);
+                stockService.removeFromAvailableStock(no, itemName, numberOfItems).then((r) => {
+                    if (r.no === no) {
+                        messageToSend = "Transation added successfully";
+                    } else if (r === null) {
+                        messageToSend = "It appears you entered a stock name you do not have please check the spelling again and send, please use the format [item name]@sold[number of items sold] e.g laptop@sold11";
+                    } else if (r === 0) {
+                        messageToSend = "It appears you entered a stock name that has since finished,Ensure you update if you have new stock ";
+                    }
+                    client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                    }).catch(console.error);
                 }).catch(console.error);
 
             } else {
