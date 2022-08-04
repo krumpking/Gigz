@@ -394,7 +394,7 @@ client.on('message', async msg => {
 
     const user = await msg.getContact();
 
-    var name = user.pushname;
+    var name = user.pushname + "!";
     if (name === undefined || name === Object.keys(user).length === 0) {
         name = "";
     }
@@ -1415,7 +1415,7 @@ client.on('message', async msg => {
                                 } else if (query === "2") { // FAQs
                                     messages.push(query);
                                     messageChain.set(no, messages);
-                                    messageToSend = "Please send the number of the option you want \n\n*1* I am looking for a service what do I do? \n*2* How do I register as a service provider? \n*3* What is a Virtual Assistant?  \n*4* What is a Landing Page? \n*5* How do I access the landing page?  \n\nFor any other questions you can contact our support number by clicking this link https://wa.me/263719940513?text=Hi+Hive+I+have+a+question";
+                                    messageToSend = "Please send the number of the option you want \n\n*1* I am looking for a service what do I do? \n*2* I am a freelancer what should I do?  \n*3* I have a business what should I do? \n*4* What is a Virtual Assistant?  \n*5* What is a Landing Page? \n*6* How do I access the landing page?  \n\nFor any other questions you can contact our support number by clicking this link https://wa.me/263719940513?text=Hi+Hive+I+have+a+question";
                                 } else if (query === "3") { // Terms and conditions
                                     messageToSend = "Sending Terms and Conditions Pdf document";
                                     var mediaMessage = "Hive Terms and Conditions";
@@ -1592,12 +1592,14 @@ client.on('message', async msg => {
                                 if (query === "1") {
                                     messageToSend = "You can service on this whatsapp system, the option to find service providers in option 1 on the welcome page, to search from this point type # to restart, then type hi, and after the welcome message, then send 1 and after the question type the service or service provider you are looking for, \n\nIT IS FREE TO USE";
                                 } else if (query === "2") {
-                                    messageToSend = "To register you need to subscribe:to subscribe send subscribe or click this link https://wa.me/263713020524?text=@subscribe, after you subscribe, on the welcome screen send 2, to register and answer the questions that follow, please ensure you follow the formats mentioned for best results";
+                                    messageToSend = "Hive will help you get clients, and begin making money registration is FREE, you only pay after you get leads, and you will see the leads as they come, to create your FREE profile, type # and send, then click the link, after the welcome message send option 2, then send option 2 and answer the few questions that follow";
                                 } else if (query === "3") {
-                                    messageToSend = "A virtual assistant is a Whatsapp with automated(Computer generated) responses sometimes refered to as Whatsapp Bot, Hive is an example of such, when you create a profile you get to create one for your services, so clients can see your prices, see Frequently asked questions, and even get a quotation in pdf format, with a virtual assistant you can concentrate on your work, while it works for you";
+                                    messageToSend = "Hive Enteprise Solution will help you lower the costs of your business with access to tools like stock management, and help you reach more people with tools like a landing page, while also helping you attending to clients with tools like a chatbot , all these normally amount to over ~2000USD~ but you can get it for only 7.99USD p.m no contract, meaning you can cancel at anytime ";
                                 } else if (query === "4") {
-                                    messageToSend = "Hive landing page is a online site for your services only available for businesses, it would be found on [yourname].hive.co.zw , and is really a website without the extra costs of a domain and hosting, and new ways of showing your website will be added weekly, it helps you increase your market reach, and attract more clients to your business";
+                                    messageToSend = "A virtual assistant is a Whatsapp with automated(Computer generated) responses sometimes refered to as Whatsapp Bot, Hive is an example of such, when you create a profile you get to create one for your services, so clients can see your prices, see Frequently asked questions, and even get a quotation in pdf format, with a virtual assistant you can concentrate on your work, while it works for you";
                                 } else if (query === "5") {
+                                    messageToSend = "Hive landing page is a online site for your services only available for businesses, it would be found on [yourname].hive.co.zw , and is really a website without the extra costs of a domain and hosting, and new ways of showing your website will be added weekly, it helps you increase your market reach, and attract more clients to your business";
+                                } else if (query === "6") {
                                     messageToSend = "You can access your landing page via the link [yourname].hive.co.zw only available for businesses, you can even use it in your marketing campaigns as it will help you leave a greater impression on the client";
                                 } else {
                                     messageToSend = "This response is out of the expected one, Please send one of the options indicated above 1 or 2 or 3 or 4";
@@ -2453,7 +2455,7 @@ client.on('message', async msg => {
                     timeOfDay = "Day";
                 }
 
-                messageToSend = `Pleasant ${timeOfDay} ${name}, welcome to Hive \n\n \n*1* Search for a service \n*2* Register \n*3* How does this work?   \n\nSend the number of the option you want, e.g send 2 if you want to register as a service provider`;
+                messageToSend = `Hi there ${name}, welcome to Hive Enterprise Solution 😊. \n\n \n*1* Search for a service \n*2* Register \n*3* Want to know more?   \n\nSend the number of the option you want, e.g send 2 if you want to register as a service provider`;
 
                 client.sendMessage(msg.from, messageToSend).then((res) => {
 
