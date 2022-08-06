@@ -5,6 +5,7 @@ var serviceAccount = require("../serviceAccountKey.json");
 // Import the functions you need from the SDKs you need
 const { initializeApp } = require('firebase/app');
 const { getStorage, ref, getDownloadURL, uploadString } = require("firebase/storage");
+// const { getAnalytics } = require("firebase/analytics");
 
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
@@ -32,6 +33,7 @@ admin.initializeApp({
 const db = admin.firestore();
 // Initialize Cloud Storage and get a reference to the service
 const storage = getStorage(app);
+// const analytics = getAnalytics(app);
 
 
 
@@ -95,6 +97,12 @@ module.exports = {
       return null;
     }
 
+  },
+  addVisitor: (no, d) => {
+    // logEvent(analytics, 'visitor', {
+    //   no: no,
+    //   date: d
+    // });
   }
 
 
