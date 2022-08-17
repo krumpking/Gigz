@@ -18,13 +18,19 @@ const reviewsModel = require("./models/reviewsModel");
 const portfolioModel = require("./models/workdoneModel");
 const QGenerator = require('./services/qGenerator');
 const StockGenerator = require('./services/stockGenerator');
+const PLGenerator = require('./services/plGenerator');
 const firebase = require("./services/firebase");
-const Worker = require('./models/workerModel.js');
-const Review = require('./models/reviewsModel.js');
+const workerModel = require('./models/workerModel.js');
 const answerModel = require("./models/answerModel");
+const incomeModel = require("./models/incomeModel");
 const stockModel = require("./models/stockModel");
+const expenseModel = require("./models/expenseModel");
 const stockService = require("./services/stockService");
 var ua = require('universal-analytics');
+const rentalItemModel = require("./models/rentalItemModel");
+const bookingService = require("./services/bookingService");
+var mongoose = require('mongoose');
+const itemBooked = require("./models/itemBooked");
 
 
 initConnection();
@@ -86,11 +92,13 @@ var pdfMap = new Map();
 var attachmentData = {};
 const contactUs = "263719066282";
 const hiveBot = "263713020524";
+var messagesSentNoMap = new Map();
 
 
 
 client.on('ready', async () => {
     console.log('Hive is running!');
+    checkMessagesWithoutReplies();
     // getAllPeopleWhoMessagedUs();
 
 
@@ -100,637 +108,6 @@ client.on('ready', async () => {
     //         mongoWorker.updateAllOther(e.no).catch(console.error);
     //     }
     // });
-    try {
-        const chats = await client.getChats();
-
-
-        chats.forEach((chat) => {
-            if (chat.unreadCount > 0) {
-                chat.fetchMessages({ limit: chat.unreadCount }).then((unreadMessages) => {
-                    let query = unreadMessages[0].body;
-                    let no = chat.id._serialized;
-                    let messages = [];
-
-
-                    if (query.substring(query.indexOf("@"), query.length).toLowerCase() === "@va" && query.includes("@va") && query.substring(0, query.indexOf("@va")) !== "add") { // Virtual Assistant channel
-                        let businessName = query.toLowerCase().substring(0, query.toLowerCase().indexOf("@va"));
-
-                        mongoWorker.checkName(businessName).then((r) => {
-                            if (r === null) {
-                                messageToSend = `Hi there!, it appears that Virtual Assistant is no longer operational, kindly contact the person who gave you the link to find out if it is still operational`;
-                                visitor.pageview(`/va/initialize/${r.name}`, function (err) {
-                                    if (err) {
-                                        console.error(err);
-                                    }
-                                    // Handle the error if necessary.
-                                    // In case no error is provided you can be sure
-                                    // the request was successfully sent off to Google.
-                                });
-                            } else {
-                                clientMap.set(no, r);
-                                messages.push(query);
-                                messageChain.set(no, messages);
-                                if (businessName.toLowerCase().replace(/\s/g, '') === "believeeducation") {
-                                    let options = {
-                                        unsafeMime: true,
-                                    }
-                                    return MessageMedia.fromUrl(r.pic, options).then((media) => {
-                                        var mess = "Welcome to Believe Eduaction, please send through your question";
-                                        client.sendMessage(msg.from, media, { caption: mess }).catch(console.error);
-                                        visitor.pageview(`/believeeducation/initialize`, function (err) {
-                                            if (err) {
-                                                console.error(err);
-                                            }
-                                            // Handle the error if necessary.
-                                            // In case no error is provided you can be sure
-                                            // the request was successfully sent off to Google.
-                                        });
-                                    }).catch(console.error);
-
-                                } else {
-                                    messageToSend = `Hi there ${r.name}!, welcome to ${businessName}'s Virtual Assistant \n\n \n*1* About ${businessName} \n*2* See services \n*3* Frequently asked questons   \n\nSend the number of the option you want, e.g send 2 if you want to see ${businessName}'s services`;
-                                }
-
-
-                            }
-                            client.sendMessage(no, messageToSend).then((res) => {
-
-                            }).catch(console.error);
-                        }).catch(console.error);
-
-
-
-                    } else if (query === "#") { // Restart coversation
-                        messageToSend = "You have restarted.\nType hi message to continue or click link below \nhttps://wa.me/263713020524?text=hie";
-
-                        client.sendMessage(no, messageToSend).then((res) => {
-                            // console.log("Res " + JSON.stringify(res));
-                            visitor.pageview(`/restart`, function (err) {
-                                if (err) {
-                                    console.error(err);
-                                }
-                                // Handle the error if necessary.
-                                // In case no error is provided you can be sure
-                                // the request was successfully sent off to Google.
-                            });
-                        }).catch((e) => {
-                            console.error(e);
-                            messageToSend = "Oooops looks like there was an error, please try again, by sending a new message ";
-
-                            client.sendMessage(no, messageToSend).then((res) => {
-                                // console.log("Res " + JSON.stringify(res));
-                                visitor.pageview(`/errorsendingmessage`, function (err) {
-                                    if (err) {
-                                        console.error(err);
-                                    }
-                                    // Handle the error if necessary.
-                                    // In case no error is provided you can be sure
-                                    // the request was successfully sent off to Google.
-                                });
-                            }).catch((console.error));
-                        });
-                    } else if (query.substring(query.indexOf('@') + 1, query.length) === "profile" && query.substring(0, query.indexOf('@')).length === 13) { // See Profile
-                        // See profile
-
-                        if (query.toLocaleLowerCase() === "@profile") {
-                            mongoWorker.getWorker(no).then((v) => {
-
-                                if (typeof v.urlName === "undefined") {
-                                    messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas}`;
-                                    client.sendMessage(msg.from, messageToSend).then((v) => {
-                                        visitor.pageview(`/profile/${v.name}`, function (err) {
-                                            if (err) {
-                                                console.error(err);
-                                            }
-                                            // Handle the error if necessary.
-                                            // In case no error is provided you can be sure
-                                            // the request was successfully sent off to Google.
-                                        });
-                                    }).catch(console.error);
-                                } else {
-                                    let website = "";
-                                    if (v.package === "7.99") {
-                                        website = `_Website_: ${v.url}`;
-                                    }
-                                    let options = {
-                                        unsafeMime: true,
-                                    }
-
-                                    if (typeof v.pic === "undefined") {
-                                        messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} \nTo chat to their Chatbot(Virtual Assistant) click \nhttps://wa.me/263713020524?text=${v.urlName}@va   \n${website}`;
-                                        client.sendMessage(msg.from, messageToSend).then((v) => {
-                                            visitor.pageview(`/profile/${v.name}`, function (err) {
-                                                if (err) {
-                                                    console.error(err);
-                                                }
-                                                // Handle the error if necessary.
-                                                // In case no error is provided you can be sure
-                                                // the request was successfully sent off to Google.
-                                            });
-                                        }).catch(console.error);
-                                    } else {
-                                        return MessageMedia.fromUrl(v.pic, options).then((media) => {
-                                            messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} \nTo chat to their Chatbot(Virtual Assistant) click \nhttps://wa.me/263713020524?text=${v.urlName}@va   \n${website}`;
-                                            client.sendMessage(msg.from, media, { caption: messageToSend }).then((v) => {
-                                                visitor.pageview(`/profile/media/${v.name}`, function (err) {
-                                                    if (err) {
-                                                        console.error(err);
-                                                    }
-                                                    // Handle the error if necessary.
-                                                    // In case no error is provided you can be sure
-                                                    // the request was successfully sent off to Google.
-                                                });
-                                            }).catch(console.error);
-                                        }).catch(console.error);
-                                    }
-                                }
-
-                            }).catch(console.error);
-                        } else {
-                            var id = query.substring(0, query.indexOf('@'));
-                            mongoWorker.getWorkerById(id).then((v) => {
-
-                                if (typeof v.urlName === "undefined") {
-                                    mongoWorker.removeBids(v.bids, v.no).catch(console.error);
-                                    messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} \n_Contact_: https://wa.me/${v.no.substring(0, v.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Hive+I+am+interested+in+your+services`;
-                                    client.sendMessage(msg.from, messageToSend).catch(console.error);
-                                    visitor.pageview(`/profile/freelancer/${v.name}`, function (err) {
-                                        if (err) {
-                                            console.error(err);
-                                        }
-                                        // Handle the error if necessary.
-                                        // In case no error is provided you can be sure
-                                        // the request was successfully sent off to Google.
-                                    });
-                                    let mess = `Number ending ${no.substring(no.indexOf("@c.us") - 3, no.indexOf("@c.us"))} just viewed your profile`;
-                                    client.sendMessage(v.no, mess).catch(console.error);
-
-                                } else {
-                                    let website = "";
-                                    if (v.package === "7.99") {
-                                        website = `_Website_: ${v.url}`;
-                                    }
-                                    let options = {
-                                        unsafeMime: true,
-                                    }
-
-                                    if (typeof v.pic === "undefined") {
-                                        messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} \nTo chat to their Chatbot(Virtual Assistant) click \nhttps://wa.me/263713020524?text=${v.urlName}@va   \n${website} \n_Contact_: https://wa.me/${v.no.substring(0, v.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Hive+I+am+interested+in+your+services`;
-                                        client.sendMessage(msg.from, messageToSend).catch(console.error);
-                                        visitor.pageview(`/profile/business/nopic/${v.name}`, function (err) {
-                                            if (err) {
-                                                console.error(err);
-                                            }
-                                            // Handle the error if necessary.
-                                            // In case no error is provided you can be sure
-                                            // the request was successfully sent off to Google.
-                                        });
-                                        let mess = `Number ending ${no.substring(no.indexOf("@c.us") - 3, no.indexOf("@c.us"))} just viewed your profile`;
-                                        client.sendMessage(v.no, mess).catch(console.error);
-                                    } else {
-
-                                        let mess = `Number ending ${no.substring(no.indexOf("@c.us") - 3, no.indexOf("@c.us"))} just viewed your profile`;
-                                        client.sendMessage(v.no, mess).catch(console.error);
-                                        visitor.pageview(`/profile/business/${v.name}`, function (err) {
-                                            if (err) {
-                                                console.error(err);
-                                            }
-                                            // Handle the error if necessary.
-                                            // In case no error is provided you can be sure
-                                            // the request was successfully sent off to Google.
-                                        });
-                                        return MessageMedia.fromUrl(v.pic, options).then((media) => {
-                                            messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} \nTo chat to their Chatbot(Virtual Assistant) click \nhttps://wa.me/263713020524?text=${v.urlName}@va   \n${website} \n_Contact_: https://wa.me/${v.no.substring(0, v.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Hive+I+am+interested+in+your+services`;
-                                            client.sendMessage(msg.from, media, { caption: messageToSend }).catch(console.error);
-
-                                        }).catch(console.error);
-                                    }
-                                }
-
-
-
-
-
-
-
-                            }).catch((e) => {
-                                console.log(e);
-                                messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
-                                client.sendMessage(msg.from, media, { caption: messageToSend }).then((v) => {
-                                    visitor.pageview(`/profile/errorshowing`, function (err) {
-                                        if (err) {
-                                            console.error(err);
-                                        }
-                                        // Handle the error if necessary.
-                                        // In case no error is provided you can be sure
-                                        // the request was successfully sent off to Google.
-                                    });
-                                }).catch(console.error);
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                    // console.log("Res " + JSON.stringify(res));
-                                }).catch(console.error);
-                            });
-                        }
-                    } else if (query.toLowerCase() === "subscribe") { // subscribe to service
-
-                        messages.push(query);
-                        messageChain.set(no, messages);
-                        messageToSend = "Please select the package you would like to subscribe to \n\n \n*1* Gold Package 7.99USD p.m (Profile , Virtual Assistant and Web page)  \n*2* Platinum Package (Custom solution to improve your services)  \n\nTo choose any option send a number eng. 1 to get pay for a Profile, Virtual Assistant and a Web page \n\nTerms and Conditions Apply, to see them send Terms or click this link https://wa.me/263713020524?text=terms";
-
-                        client.sendMessage(no, messageToSend).then((res) => {
-                            // console.log("Res " + JSON.stringify(res));
-                            visitor.pageview("/subscribe/initialize", function (err) {
-                                if (err) {
-                                    console.error(err);
-                                }
-                                // Handle the error if necessary.
-                                // In case no error is provided you can be sure
-                                // the request was successfully sent off to Google.
-                            });
-                        }).catch((console.error));
-                    } else if (query.toLowerCase() === "terms") { // See Terms
-
-                        var mediaMessage = "Hive Terms and Conditions";
-                        const media = MessageMedia.fromFilePath('./t&cs.pdf');
-
-                        client.sendMessage(no, media, { caption: mediaMessage }).catch(console.error);
-                        client.sendMessage(no, mediaMessage).then((res) => {
-                            // console.log("Res " + JSON.stringify(res));
-                            visitor.pageview("/terms", function (err) {
-                                if (err) {
-                                    console.error(err);
-                                }
-                                // Handle the error if necessary.
-                                // In case no error is provided you can be sure
-                                // the request was successfully sent off to Google.
-                            });
-                        }).catch((console.error));
-                    } else if (query.substring(query.indexOf('@') + 1, query.length) === "portfolio" && query.includes("@portfolio")) { // See portfolio
-
-                        mongoWorker.getWorker(no).then((v) => {
-                            if (v === null) {
-
-                                messageToSend = "It appears this user is yet to create an account, only registered people can add their portfolio pictures";
-                                visitor.pageview("/addportfolio/noaccount", function (err) {
-                                    if (err) {
-                                        console.error(err);
-                                    }
-                                    // Handle the error if necessary.
-                                    // In case no error is provided you can be sure
-                                    // the request was successfully sent off to Google.
-                                });
-                            } else {
-                                messages.push(query);
-                                messageChain.set(no, messages);
-                                clientMap.set(no, v);
-                                messageToSend = "You want to add to your portfolio which showcases the work you have done, great, we take one picture per description, we advise you to post *only the best pictures*";
-                                visitor.pageview("/addportfolio/initialize", function (err) {
-                                    if (err) {
-                                        console.error(err);
-                                    }
-                                    // Handle the error if necessary.
-                                    // In case no error is provided you can be sure
-                                    // the request was successfully sent off to Google.
-                                });
-                            }
-                            client.sendMessage(no, messageToSend).then((res) => {
-                                // console.log("Res " + JSON.stringify(res));
-                            }).catch((console.error));
-                        }).catch(console.error);
-                    } else if (query.substring(query.indexOf('@') + 1, query.length) === "pic") {
-
-                        mongoWorker.getWorker(no).then((v) => {
-                            if (v === null) {
-
-                                messageToSend = "It appears this user is yet to create an account, only registered people can add their profile pictures";
-                                visitor.pageview("/addpic/noaccount", function (err) {
-                                    if (err) {
-                                        console.error(err);
-                                    }
-                                    // Handle the error if necessary.
-                                    // In case no error is provided you can be sure
-                                    // the request was successfully sent off to Google.
-                                });
-                            } else {
-                                messages.push(query);
-                                messageChain.set(no, messages);
-                                clientMap.set(no, v);
-                                messageToSend = "You want to add your picture, great, send your picture now";
-                                visitor.pageview("/addpic/initialize", function (err) {
-                                    if (err) {
-                                        console.error(err);
-                                    }
-                                    // Handle the error if necessary.
-                                    // In case no error is provided you can be sure
-                                    // the request was successfully sent off to Google.
-                                });
-                            }
-                            client.sendMessage(no, messageToSend).then((res) => {
-                                // console.log("Res " + JSON.stringify(res));
-                            }).catch((console.error));
-                        }).catch(console.error);
-
-                    } else if (query.substring(query.indexOf('@') + 1, query.length) === "rate" && query.includes("@rate")) { // rate or put recommendations
-
-                        let username = query.substring(0, query.indexOf('@'));
-                        mongoWorker.checkName(username).then((v) => {
-
-                            if (v === null) {
-                                messageToSend += `We do not appear to have this user in our database, please ask them again, and try again`;
-                                visitor.pageview("/rate/noaccount", function (err) {
-                                    if (err) {
-                                        console.error(err);
-                                    }
-                                    // Handle the error if necessary.
-                                    // In case no error is provided you can be sure
-                                    // the request was successfully sent off to Google.
-                                });
-                            } else {
-                                messages.push(query.toLowerCase());
-                                messageChain.set(no, messages);
-                                messageToSend += `Thank you for rating the service you got, on a scale of 1 to 5, how would you rate the service you got, you can only type a number between 1 and 5`;
-                                visitor.pageview("/rate/initialize", function (err) {
-                                    if (err) {
-                                        console.error(err);
-                                    }
-                                    // Handle the error if necessary.
-                                    // In case no error is provided you can be sure
-                                    // the request was successfully sent off to Google.
-                                });
-                            }
-                            client.sendMessage(no, messageToSend).then((res) => {
-
-                            }).catch(console.error);
-
-                        }).catch(console.error);
-                    } else if (query.toLowerCase() === "addva") {
-
-                        mongoWorker.getWorker(no).then((v) => {
-                            if (v === null) {
-                                messageToSend = `It appears you are yet to create an account, create an account today, by selecting option 2, on the welcome message, send any message now to get to the main page`;
-                                visitor.pageview("/addva/noaccount", function (err) {
-                                    if (err) {
-                                        console.error(err);
-                                    }
-                                    // Handle the error if necessary.
-                                    // In case no error is provided you can be sure
-                                    // the request was successfully sent off to Google.
-                                });
-                            } else {
-                                clientMap.set(no, v);
-                                messages.push(query.toLowerCase());
-                                messageChain.set(no, messages);
-                                messageToSend = `Add your Chatbot(Virtual Assistant) \nPlease list all your services and the price for each separated by a semicolon in this format descr=amount and send them, all the you services listed above \ne.g website deveopmen=100USD; Mobile Application development=300USD \nOR \nMoving goods local(in town)=10USD;Moving goods above 2T=45USD \nOR \nPedicure=7USD,Manicure=10USD \n\nIf you need to Edit your Chatbot (Virtual Assistant) click this link https://wa.me/${hiveBot}?text=addva`;
-                                visitor.pageview("/addva/initialize", function (err) {
-                                    if (err) {
-                                        console.error(err);
-                                    }
-                                    // Handle the error if necessary.
-                                    // In case no error is provided you can be sure
-                                    // the request was successfully sent off to Google.
-                                });
-                            }
-                            client.sendMessage(no, messageToSend).then((res) => {
-
-                            }).catch(console.error);
-                        }).catch(console.error);
-                    } else if (query.toLowerCase() === "@update") {
-
-                        mongoWorker.getWorker(no).then((v) => {
-                            if (v === null) {
-                                messageToSend = `It appears you are yet to create an account, create an account today, by selecting option 2, on the welcome message, send any message now to get to the main page`;
-                                visitor.pageview("/update/noaccount", function (err) {
-                                    if (err) {
-                                        console.error(err);
-                                    }
-                                    // Handle the error if necessary.
-                                    // In case no error is provided you can be sure
-                                    // the request was successfully sent off to Google.
-                                });
-                            } else {
-                                clientMap.set(no, v);
-                                messages.push(query.toLowerCase());
-                                messageChain.set(no, messages);
-                                visitor.pageview("/update/initialize", function (err) {
-                                    if (err) {
-                                        console.error(err);
-                                    }
-                                    // Handle the error if necessary.
-                                    // In case no error is provided you can be sure
-                                    // the request was successfully sent off to Google.
-                                });
-                                messageToSend = `Hie ${v.name} , you want to update your account, you can not change your name, however you can update on other things, for your Chatbot(Virtual Assistant) click this link to update it https://wa.me/263713020524?text=addva \n\nPlease type your updated intro about yourself`;
-                            }
-                            client.sendMessage(no, messageToSend).then((res) => {
-
-                            }).catch(console.error);
-                        }).catch(console.error);
-                    } else if (query.toLowerCase() === "believeeducation@add") { // Believe education auth and ask for info
-
-                        mongoWorker.getWorker(no).then((v) => {
-                            if (v.urlName === "lionelchidzivabelieveeducationpvtltd") {
-                                clientMap.set(no, v);
-                                messages.push(query.toLowerCase());
-                                messageChain.set(no, messages);
-                                messageToSend = `Hie ${v.name} , you are about to add information for your students, please answer the next few questions. Please type the information your want to add e.g `;
-                            } else {
-                                messageToSend = `You do not have access to add information to this account`;
-
-                            }
-                            client.sendMessage(no, messageToSend).then((res) => {
-                                visitor.pageview("/welcomemessage", function (err) {
-                                    if (err) {
-                                        console.error(err);
-                                    }
-                                    // Handle the error if necessary.
-                                    // In case no error is provided you can be sure
-                                    // the request was successfully sent off to Google.
-                                });
-                            }).catch(console.error);
-                        }).catch(console.error);
-                    } else if (query.toLowerCase() === "@addstock") { // Add stock name
-
-                        mongoWorker.getWorker(no).then((v) => {
-                            if (typeof v.urlName === "undefined" || v.expired) {
-
-                                if (v.expired) {
-                                    messageToSend = `Your account expired, please renew to continue enjoying the full benefits https://wa.me/${hiveBot}?text=@subscribe`;
-                                } else {
-                                    messageToSend = `Only businesses can add stock`;
-                                }
-
-                            } else {
-                                messages.push(query);
-                                messageChain.set(no, messages);
-                                messageToSend = `Hie ${v.name} , You are about to add stock, what is the name of item, \n\nN.B Ensure you put in a name you can remember which you will use to confirm it has been bought`;
-                            }
-                            client.sendMessage(msg.from, messageToSend).then((res) => {
-                                visitor.pageview(`/addstock/${v.name}`, function (err) {
-                                    if (err) {
-                                        console.error(err);
-                                    }
-                                    // Handle the error if necessary.
-                                    // In case no error is provided you can be sure
-                                    // the request was successfully sent off to Google.
-                                });
-                            }).catch(console.error);
-                        }).catch(console.error);
-
-
-                    } else if (query.toLowerCase() === "@stock") { // View stock
-
-                        stockService.seeAvailableStock(no).then((v) => {
-                            if (v.length > 0) {
-
-                                messages.push(query);
-                                messageChain.set(no, messages);
-                                clientMap.set(no, v);
-                                messageToSend = `How would you like to see your stock report, \n\n*1* Pdf format(Looks better this way) \n*2* As a normal message`;
-                                var stock = {};
-
-                                var uniqueID = new Date().getTime().toString();
-                                stock.name = `stock ${uniqueID}`;
-                                pdfMap.set(no, uniqueID);
-
-                                stock.dueDate = `${new Date().getMonth() + 1}/${new Date().getDate()}/${new Date().getFullYear()}`;
-                                let stockItems = [];
-                                let subtotal = 0;
-                                for (let index = 0; index < v.length; index++) {
-
-                                    stockItems.push({
-                                        description: v[index].visibleName,
-                                        quantity: v[index].numberOfItems,
-                                        price: v[index].itemPrice,
-                                        amount: v[index].itemPrice * v[index].numberOfItems,
-                                    });
-                                    subtotal += (v[index].itemPrice * v[index].numberOfItems);
-
-
-                                }
-                                stock.items = stockItems;
-                                stock.subtotal = subtotal;
-                                const stockGenerator = new StockGenerator(stock);
-
-                                stockGenerator.generate();
-                            } else {
-                                messageToSend = `It appears you have no stock available`;
-                            }
-                            client.sendMessage(msg.from, messageToSend).then((res) => {
-                                visitor.pageview(`/seestock/${v.name}`, function (err) {
-                                    if (err) {
-                                        console.error(err);
-                                    }
-                                    // Handle the error if necessary.
-                                    // In case no error is provided you can be sure
-                                    // the request was successfully sent off to Google.
-                                });
-                            }).catch(console.error);
-                        }).catch(console.error);
-                    } else if (query.toLowerCase() === "@addstockmember") { // Add someone else to be able to see what is going on 
-
-                        stockService.seeAvailableStock(no).then((v) => {
-                            if (v.length > 0) {
-                                clientMap.set(no, v);
-                                messages.push(query);
-                                messageChain.set(no, messages);
-                                messageToSend = `Please send the number of the person you want to add to be able to view the stock in the format 0712345678`;
-                            } else {
-                                messageToSend = `It appears you have no stock available`;
-                            }
-                            client.sendMessage(msg.from, messageToSend).then((res) => {
-                                visitor.pageview(`/addstockmember/${v.name}`, function (err) {
-                                    if (err) {
-                                        console.error(err);
-                                    }
-                                    // Handle the error if necessary.
-                                    // In case no error is provided you can be sure
-                                    // the request was successfully sent off to Google.
-                                });
-                            }).catch(console.error);
-                        }).catch(console.error);
-                    } else if (query.includes("@sold")) { // Confirm sold item keyword laptop@sold12
-
-                        let itemName = query.substring(0, query.indexOf("@sold"));
-                        let numberOfItems = parseInt(query.substring(query.indexOf("@sold") + 5, query.length));
-                        if (typeof parseInt(numberOfItems) === "number") {
-
-                            stockService.removeFromAvailableStock(no, itemName, numberOfItems).then((r) => {
-                                if (r.no === no) {
-                                    messageToSend = "Transation added successfully";
-                                } else if (r === null) {
-                                    messageToSend = "It appears you entered a stock name you do not have please check the spelling again and send, please use the format [item name]@sold[number of items sold] e.g laptop@sold11";
-                                } else if (r === 0) {
-                                    messageToSend = "It appears you entered a stock name that has since finished,Ensure you update if you have new stock ";
-                                }
-                                client.sendMessage(msg.from, messageToSend).then((res) => {
-                                    visitor.pageview(`/itemssold`, function (err) {
-                                        if (err) {
-                                            console.error(err);
-                                        }
-                                        // Handle the error if necessary.
-                                        // In case no error is provided you can be sure
-                                        // the request was successfully sent off to Google.
-                                    });
-                                }).catch(console.error);
-                            }).catch(console.error);
-
-                        } else {
-                            messageToSend = "The number of items sold are not clear, please use the format [item name]@sold[number of items sold] e.g laptop@sold11";
-                            client.sendMessage(msg.from, messageToSend).then((res) => {
-                                visitor.pageview(`/wrongnumberofitemssolds`, function (err) {
-                                    if (err) {
-                                        console.error(err);
-                                    }
-                                    // Handle the error if necessary.
-                                    // In case no error is provided you can be sure
-                                    // the request was successfully sent off to Google.
-                                });
-                            }).catch(console.error);
-                        }
-                    } else {
-
-                        // user has not communicated yet, welcome them
-
-                        messages.push("1073unashe");
-                        messageChain.set(no, messages);
-                        var timeOfDay = "";
-                        if (new Date().getHours() < 12) {
-                            timeOfDay = "Morning";
-                        } else if (new Date().getHours() > 12 && new Date().getHours() < 16) {
-                            timeOfDay = "Afternoon";
-                        } else {
-                            timeOfDay = "Day";
-                        }
-
-                        messageToSend = `Pleasant ${timeOfDay}, welcome to Hive \n\n \n*1* Search for a service \n*2* Register \n*3* How does this work?   \n\nSend the number of the option you want, e.g send 2 if you want to register as a service provider`;
-
-                        client.sendMessage(no, messageToSend).then((res) => {
-                            visitor.pageview("/welcomemessage", function (err) {
-                                if (err) {
-                                    console.error(err);
-                                }
-                                // Handle the error if necessary.
-                                // In case no error is provided you can be sure
-                                // the request was successfully sent off to Google.
-                            });
-                        }).catch(console.error);
-
-
-
-                    }
-
-
-
-
-
-
-                }).catch(console.error);
-            }
-
-        });
-    } catch (error) {
-        console.error(error);
-    }
 
 
 });
@@ -746,7 +123,6 @@ client.on('disconnected', (reason) => {
 
 
 client.on('message', async msg => {
-
 
 
 
@@ -775,6 +151,15 @@ client.on('message', async msg => {
     // const sessionId = randomString({ length: 20 });
     const query = msg.body;
     const no = msg.from;
+
+    if (messagesSentNoMap.size > 5) {
+        messagesSentNoMap.clear();
+    }
+
+    if (!messagesSentNoMap.has(no)) {
+        messagesSentNoMap.set(no, "1");
+    }
+
 
     // Initialise visitor analytics
     var visitor = ua('UA-203224382-1', no, { strictCidFormat: false });
@@ -839,6 +224,24 @@ client.on('message', async msg => {
                                     // In case no error is provided you can be sure
                                     // the request was successfully sent off to Google.
                                 });
+                            }).catch(console.error);
+                        }).catch(console.error);
+
+                    } else if (businessName.toLowerCase().replace(/\s/g, '') === "yarutsocarrental") {
+                        let options = {
+                            unsafeMime: true,
+                        }
+                        return MessageMedia.fromUrl(r.pic, options).then((media) => {
+                            var mess = "Welcome to Yarutso Car Rental, \n\n*1* See available vehicles \n*2* Contact support";
+                            client.sendMessage(msg.from, media, { caption: mess }).then((r) => {
+                                // visitor.pageview(`/va/yarutso`, function (err) {
+                                //     if (err) {
+                                //         console.error(err);
+                                //     }
+                                // Handle the error if necessary.
+                                // In case no error is provided you can be sure
+                                // the request was successfully sent off to Google.
+                                // });
                             }).catch(console.error);
                         }).catch(console.error);
 
@@ -1033,9 +436,9 @@ client.on('message', async msg => {
             }
 
 
-        } else if (query.toLowerCase() === "@subscribe") { // subscribe to service
+        } else if (query.toLowerCase() === "@subscribe" || query.toLowerCase() === "subscribe") { // subscribe to service
             messageChain.delete(no); //Ensure all previous messages are deleted
-            messages.push(query);
+            messages.push("@subscribe");
             messageChain.set(no, messages);
             messageToSend = "Please select the package you would like to subscribe to \n\n \n*1* Gold Package 7.99USD p.m (Profile , Virtual Assistant and Web page)  \n*2* Platinum Package (Custom solution to improve your services)  \n\nTo choose any option send a number eng. 1 to get pay for a Profile, Virtual Assistant and a Web page \n\nTerms and Conditions Apply, to see them send Terms or click this link https://wa.me/263713020524?text=terms";
 
@@ -1173,7 +576,7 @@ client.on('message', async msg => {
                     clientMap.set(no, v);
                     messages.push(query.toLowerCase());
                     messageChain.set(no, messages);
-                    messageToSend = `Hie ${v.name} , you want to update your account, you can not change your name, however you can update on other things, for your Chatbot(Virtual Assistant) click this link to update it https://wa.me/263713020524?text=addva \n\nPlease type your updated intro about yourself`;
+                    messageToSend = `Hie ${v.name} , you want to update your account, you can not change your name, \n\nPlease type your updated intro about yourself`;
                 }
                 client.sendMessage(msg.from, messageToSend).then((res) => {
                     visitor.pageview(`/updateaccount/initialize/${v.name}`, function (err) {
@@ -1209,13 +612,38 @@ client.on('message', async msg => {
                     });
                 }).catch(console.error);
             }).catch(console.error);
+        } else if (query.toLowerCase() === "yarutso@add") { // Add vehicle
+            messageChain.delete(no);
+            mongoWorker.getWorker(no).then((v) => {
+                // if (v.urlName === "believeeducation") {
+                clientMap.set(no, v);
+                messages.push(query.toLowerCase());
+                messageChain.set(no, messages);
+                messageToSend = `Hie ${v.name} , you are about to add vehicle type for Yarutso Rental Co, please answer the next few questions. \nPlease send the full description of the vehicle you want to add including the price`;
+                // } else {
+                //     messageToSend = `You do not have access to add information to this account`;
+                //     messageChain.delete(no);
+                // }
+                client.sendMessage(msg.from, messageToSend).then((res) => {
+                    visitor.pageview(`/yarutso/initialize`, function (err) {
+                        if (err) {
+                            console.error(err);
+                        }
+                        // Handle the error if necessary.
+                        // In case no error is provided you can be sure
+                        // the request was successfully sent off to Google.
+                    });
+                }).catch(console.error);
+            }).catch(console.error);
         } else if (query.toLowerCase() === "@instructions") {
             messageChain.delete(no);
             mongoWorker.getWorker(no).then((v) => {
-                if (typeof v.package === "0" || typeof v.package === "undefined") {
-                    messageToSend = `Hie ${v.name} , here are some important keywords you can take advantage of \n\nkeyword @profile to see your profile \n\nkeyword @update to update your account \n\nkeyword @terms to see Hive Terms and Conditions`;
+                console.log(typeof v.urlName);
+                console.log(typeof v.url);
+                if (typeof v.urlName !== "undefined" && typeof v.url !== "undefined") {
+                    messageToSend = `Hie ${v.name} , here are the options you have as a business account holder, use these keywords to help you use your Hive account to its fullest potential \n\nkeyword @service to add your services \n\nkeyword @faq to add frequently asked questions \n\nkeyword @portfolio to add work done before \n\nkeyword @pic to add your main display picture for your hive website \n\nkeyword @update to update your account information \n\nkeyword @subscribe to subscribe  \n\nkeyword @profile to see your profile`;
                 } else {
-                    messageToSend = `Hie ${v.name} , here are the options you have as a business account holder, use these keywords to help you use your Hive account to its fullest potential \n\nkeyword @services to add your services \n\nkeyword @faq to add frequently asked questions \n\nkeyword @portfolio to add work done before \n\nkeyword @pic to add your main display picture for your hive website \n\nkeyword @update to update your account information \n\nkeyword @subscribe to subscribe  \n\nkeyword @profile to see your profile`;
+                    messageToSend = `Hie ${v.name} , here are some important keywords you can take advantage of \n\nkeyword @profile to see your profile \n\nkeyword @update to update your account \n\nkeyword @terms to see Hive Terms and Conditions`;
                 }
                 client.sendMessage(msg.from, messageToSend).then((res) => {
                     visitor.pageview(`/instructions/${v.name}`, function (err) {
@@ -1387,7 +815,7 @@ client.on('message', async msg => {
             }).catch(console.error);
         } else if (query.includes("@sold")) { // Confirm sold item keyword laptop@sold12
             messageChain.delete(no);
-            let itemName = query.substring(0, query.indexOf("@sold"));
+            let itemName = query.substring(0, query.indexOf("@sold")).replace(/\s/g, '');
             let numberOfItems = parseInt(query.substring(query.indexOf("@sold") + 5, query.length));
             if (typeof parseInt(numberOfItems) === "number") {
 
@@ -1424,6 +852,238 @@ client.on('message', async msg => {
                     });
                 }).catch(console.error);
             }
+        } else if (query.toLowerCase() === "@pl") { //TODO send profit and loss report
+            messageChain.delete(no);
+            stockService.getPLReport(no).then((v) => {
+                if (v.income.length < 1 && v.expense.length < 1) {
+                    messageToSend = `You do not have an information`;
+
+                } else {
+                    messages.push(query);
+                    messageChain.set(no, messages);
+                    clientMap.set(no, v);
+                    var pl = {};
+
+                    var uniqueID = new Date().getTime().toString();
+                    pl.name = `pl ${uniqueID}`;
+                    pdfMap.set(no, uniqueID);
+
+
+                    let sales = [];
+                    let otherIncome = [];
+                    let salesTotal = 0;
+                    let otherIncomeTotal = 0;
+                    for (let index = 0; index < v.income.length; index++) {
+
+
+                        if (v.income[index].category === "sales") {
+                            sales.push({
+                                description: v.income[index].itemName,
+                                quantity: v.income[index].numberOfItems,
+                                price: v.income[index].amount,
+                                amount: v.income[index].amount,
+                            });
+                            salesTotal += (v.income[index].amount * v.income[index].numberOfItems);
+                        } else if (v.income[index].category === "other") {
+                            otherIncome.push({
+                                description: v.income[index].itemName,
+                                quantity: v.income[index].numberOfItems,
+                                price: v.income[index].amount,
+                                amount: v.income[index].amount,
+                            });
+                            otherIncomeTotal += (v.income[index].amount * v.income[index].numberOfItems);
+                        }
+
+
+
+
+
+                    }
+                    pl.sales = sales;
+                    pl.otherIncome = otherIncome;
+                    pl.salesTotal = salesTotal;
+                    pl.otherIncomeTotal = otherIncomeTotal;
+
+
+                    let cogs = 0;
+                    let salaries = 0;
+                    let rentals = 0;
+                    let utilities = 0;
+                    let transport = 0;
+                    let supplies = 0;
+                    let otherExpenses = 0;
+                    for (let index = 0; index < v.expense.length; index++) {
+
+                        switch (v.expense[index].itemDescription) {
+                            case "cost of goods sold":
+                                cogs += v.expense[index].amount;
+                                break;
+                            case "salaries":
+                                salaries += v.expense[index].amount;
+                                break;
+                            case "rentals and outgoings":
+                                rentals += v.expense[index].amount;
+                                break;
+                            case "utilities including internet & telephone":
+                                utilities += v.expense[index].amount;
+                                break;
+                            case "transport & logistics":
+                                transport += v.expense[index].amount;
+                                break;
+                            case "office supplies":
+                                supplies += v.expense[index].amount;
+                                break;
+                            case "other":
+                                otherExpenses += v.expense[index].amount;
+                                break;
+                            default:
+                                otherExpenses += v.expense[index].amount;
+                                break;
+                        }
+
+
+                    }
+
+                    pl.cogs = cogs;
+                    pl.salaries = salaries;
+                    pl.rentals = rentals;
+                    pl.utilities = utilities;
+                    pl.transport = transport;
+                    pl.supplies = supplies;
+                    pl.otherExpenses = otherExpenses;
+                    pl.no = no;
+
+                    const plGenerator = new PLGenerator(pl);
+
+                    plGenerator.generate();
+
+                    // Put data on pdf
+                    messageToSend = `Hie there! Your financial report has be generated would you like to see it? \n*1* Yes \n*2* No, delete it`;
+                }
+                client.sendMessage(msg.from, messageToSend).then((res) => {
+                    visitor.pageview(`/plinitialize/${v.name}`, function (err) {
+                        if (err) {
+                            console.error(err);
+                        }
+                        // Handle the error if necessary.
+                        // In case no error is provided you can be sure
+                        // the request was successfully sent off to Google.
+                    });
+                }).catch(console.error);
+            }).catch(console.error);
+        } else if (query.toLowerCase() === "@cost") {
+            messageChain.delete(no);
+            mongoWorker.getWorker(no).then((v) => {
+                if (typeof v.urlName === "undefined" || v.expired) {
+
+                    if (v.expired) {
+                        messageToSend = `Your account expired, please renew to continue enjoying the full benefits https://wa.me/${hiveBot}?text=@subscribe`;
+                    } else {
+                        messageToSend = `Only businesses can add their costs`;
+                    }
+
+                } else {
+                    messages.push(query);
+                    messageChain.set(no, messages);
+                    messageToSend = `Hie there ${v.name}! , You are about to add an expense, please select the category of cost \n\n*1* Cost of goods sold \n*2* Salaries \n*3* Rentals and outgoings \n*4* Utilities including Internet & telephone \n*5* Transport & Logistics \n*6* Office supplies \n*7* Other \n\nN.B Ensure you send in correct details because you can not edit this later`;
+                }
+                client.sendMessage(msg.from, messageToSend).then((res) => {
+                    visitor.pageview(`/addstock/${v.name}`, function (err) {
+                        if (err) {
+                            console.error(err);
+                        }
+                        // Handle the error if necessary.
+                        // In case no error is provided you can be sure
+                        // the request was successfully sent off to Google.
+                    });
+                }).catch(console.error);
+            }).catch(console.error);
+        } else if (query.toLowerCase() === "@income") {
+            messageChain.delete(no);
+            mongoWorker.getWorker(no).then((v) => {
+                if (typeof v.urlName === "undefined" || v.expired) {
+
+                    if (v.expired) {
+                        messageToSend = `Your account expired, please renew to continue enjoying the full benefits https://wa.me/${hiveBot}?text=@subscribe`;
+                    } else {
+                        messageToSend = `Only businesses can add their income`;
+                    }
+
+                } else {
+                    messages.push(query);
+                    messageChain.set(no, messages);
+                    messageToSend = `Hie there ${v.name}! , You are about to add another income source, please send the description of this income source, \n\nN.B Ensure you send in correct details because you can not edit this later`;
+                }
+                client.sendMessage(msg.from, messageToSend).then((res) => {
+                    visitor.pageview(`/addstock/${v.name}`, function (err) {
+                        if (err) {
+                            console.error(err);
+                        }
+                        // Handle the error if necessary.
+                        // In case no error is provided you can be sure
+                        // the request was successfully sent off to Google.
+                    });
+                }).catch(console.error);
+            }).catch(console.error);
+        } else if (query.substring(query.indexOf('@') + 1, query.length) === "bookyarutso" && query.substring(0, query.indexOf('@')).length === 24) {
+            messageChain.delete(no);
+            messages.push(query);
+            messageChain.set(no, messages);
+            var id = query.substring(0, query.indexOf('@'));
+            bookingService.checkBooking(id).then((r) => {
+
+                
+                if (r.length > 0) {
+                    clientMap.set(no, r);
+                    var mess = `You are about to book the car above, it is available now, but it booked on the follow dates,`
+                    for (let index = 0; index < r.length; index++) {
+                        const element = r[index];
+                        let d = new Date(r[index].dateOfBooking);
+                        let fD = new Date(r[index].dateOfReturn);
+                        let dateNoLongerAvailable = d.getDay() + " " + showMonth(d.getMonth()) + " " + d.getFullYear();
+                        let dateLaterAvailable = fD.getDay() + " " + showMonth(fD.getMonth()) + " " + fD.getFullYear();
+                        mess += `\n\nFrom ${dateNoLongerAvailable} to ${dateLaterAvailable} `;
+                    }
+                    mess += `You can book but only dates outside of those show about  \nIf you still want to book this vehicle , send your name(the name underwhich the booking will be done) \n\nIf this is not what you want type # to restart`
+
+                } else {
+                    var mess = "You are about to book a vehicle above, please send you full name(or the name under which you want to make the booking)?  ";
+                }
+                client.sendMessage(msg.from, mess).then((r) => {
+                    // visitor.pageview(`/va/believeeducation`, function (err) {
+                    //     if (err) {
+                    //         console.error(err);
+                    //     }
+                    // Handle the error if necessary.
+                    // In case no error is provided you can be sure
+                    // the request was successfully sent off to Google.
+                    // });
+                }).catch(console.error);
+
+
+            }).catch(console.error);
+        } if(query === "@seebookings"){
+
+            mongoWorker.getWorker(no).then((r) => {
+
+                if(r.urlName === "yarutsocarrental"){
+                    messageToSend = ""
+                } else {
+                    messageToSend = "You do not have permission to see the bookings"
+                }
+
+                client.sendMessage(msg.from, mess).then((r) => {
+                    // visitor.pageview(`/va/believeeducation`, function (err) {
+                    //     if (err) {
+                    //         console.error(err);
+                    //     }
+                    // Handle the error if necessary.
+                    // In case no error is provided you can be sure
+                    // the request was successfully sent off to Google.
+                    // });
+                }).catch(console.error);
+
+            }).catch(console.error);
 
         } else {
 
@@ -1482,7 +1142,8 @@ client.on('message', async msg => {
                             } else if (messages[0].substring(messages[0].indexOf("@"), messages[0].length).toLowerCase() === "@va" && messages[0].includes("@va")) {
 
                                 let v = clientMap.get(no);
-                                if (v.urlName === "believeeducation") {
+                                let businessName = v.urlName;
+                                if (businessName === "believeeducation") {
                                     beliveEducationService.getAnswer(query).then((r) => {
                                         let mess = "";
                                         if (r.primary) {
@@ -1541,6 +1202,54 @@ client.on('message', async msg => {
 
 
                                     });
+                                } else if (businessName.toLowerCase().replace(/\s/g, '') === "yarutsocarrental") {
+
+                                    if (query === "1") {
+                                        bookingService.getAvailableRentalItems().then((r) => {
+                                            if (r.length > 0) {
+                                                messages.push(query);
+                                                messageChain.set(no, messages);
+
+                                                messageToSend += "Available vehicles right now\n\n";
+                                                // visitor.pageview(`/search/results/${query}`, function (err) {
+                                                //     if (err) {
+                                                //         console.error(err);
+                                                //     }
+                                                // Handle the error if necessary.
+                                                // In case no error is provided you can be sure
+                                                // the request was successfully sent off to Google.
+                                                // });
+
+
+                                                r.forEach((el) => {
+                                                    let id = mongoose.Types.ObjectId(el._id).toString();
+                                                    messageToSend += `${el.description} \n_Click here to book this vehicle_: https://wa.me/263713020524?text=${id}@bookyarutso \n___________________________  \n\n`;
+
+                                                });
+                                                messageToSend += "_________________END_________________\n";
+                                                messageToSend += `Please send click the link of the vehicle you want to book \n\nIf this is not what you want type # to restart`;
+                                            } else {
+                                                messageToSend = "Yarutso is yet to list any vehicle"
+                                            }
+                                            client.sendMessage(msg.from, messageToSend).then((res) => {
+                                                // console.log("Res " + JSON.stringify(res));
+
+                                            }).catch((console.error));
+                                        }).catch(console.error);
+
+                                    } else if (query === "2") {
+                                        messageToSend = "Please click this link to get in touch with support https://wa.me/263713120606?text=Hi+Yarutso+I+need+your+assistance, ";
+                                        client.sendMessage(msg.from, messageToSend).then((res) => {
+                                            // console.log("Res " + JSON.stringify(res));
+
+                                        }).catch((console.error));
+                                    } else {
+                                        messageToSend = "Please select the one of the options above, if this is not what you want, type # to restart";
+                                        client.sendMessage(msg.from, messageToSend).then((res) => {
+                                            // console.log("Res " + JSON.stringify(res));
+
+                                        }).catch((console.error));
+                                    }
 
                                 } else if (query === "1") { // About
                                     let website = `${v.name}.hive.co.zw`;
@@ -1827,6 +1536,21 @@ client.on('message', async msg => {
                                         // the request was successfully sent off to Google.
                                     });
                                 }).catch(console.error);
+                            } else if (messages[0] === "yarutso@add") { // Yarutso add
+                                messages.push(query);
+                                messageChain.set(no, messages);
+                                messageToSend = "Please send the best picture of this vehicle";
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                    // console.log("Res " + JSON.stringify(res));
+                                    visitor.pageview(`/yarutso/sendpicture`, function (err) {
+                                        if (err) {
+                                            console.error(err);
+                                        }
+                                        // Handle the error if necessary.
+                                        // In case no error is provided you can be sure
+                                        // the request was successfully sent off to Google.
+                                    });
+                                }).catch(console.error);
                             } else if (messages[0] === "@service") { // Add service price
                                 messages.push(query);
                                 messageChain.set(no, messages);
@@ -1952,8 +1676,152 @@ client.on('message', async msg => {
 
                                     }).catch(console.error);
                                 }
+                            } else if (messages[0] === "@cost") {
+
+
+                                if (typeof parseInt(query) === "number" && parseInt(query) < 8) {
+
+                                    let category = "other";
+                                    switch (parseInt(query)) {
+                                        case 1:
+                                            category = "cost of goods sold";
+                                            break;
+                                        case 2:
+                                            category = "salaries";
+                                            break;
+                                        case 3:
+                                            category = "rentals and outgoings";
+                                            break;
+                                        case 4:
+                                            category = "utilities including internet & telephone";
+                                            break;
+                                        case 5:
+                                            category = "transport & logistics";
+                                            break;
+                                        case 6:
+                                            category = "office supplies";
+                                            break;
+                                        case 7:
+                                            category = "other";
+                                            break;
+                                        default:
+                                            category = "other";
+                                            break;
+                                    }
+                                    messages.push(category);
+                                    messageChain.set(no, messages);
+                                    messageToSend = `Please send the cost of ${category} in USD \n\nN.B this has to be a number`;
+                                    visitor.pageview(`/expense/category`, function (err) {
+                                        if (err) {
+                                            console.error(err);
+                                        }
+                                        // Handle the error if necessary.
+                                        // In case no error is provided you can be sure
+                                        // the request was successfully sent off to Google.
+                                    });
+                                } else {
+                                    messageToSend = `Please ensure you send one of the options above \n\nN.B this has to be a number`;
+                                    visitor.pageview(`/expense/notanumber`, function (err) {
+                                        if (err) {
+                                            console.error(err);
+                                        }
+                                        // Handle the error if necessary.
+                                        // In case no error is provided you can be sure
+                                        // the request was successfully sent off to Google.
+                                    });
+                                }
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                    // console.log("Res " + JSON.stringify(res));
+
+                                }).catch(console.error);
+                            } else if (messages[0] === "@income") {
+                                messages.push(query);
+                                messageChain.set(no, messages);
+                                messageToSend = `Please send the dollar amount of ${query}  \n\nN.B this has to be a number`;
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                    // console.log("Res " + JSON.stringify(res));
+                                    visitor.pageview(`/addstock/numberofitems`, function (err) {
+                                        if (err) {
+                                            console.error(err);
+                                        }
+                                        // Handle the error if necessary.
+                                        // In case no error is provided you can be sure
+                                        // the request was successfully sent off to Google.
+                                    });
+                                }).catch(console.error);
+                            } else if (messages[0] === "@pl") { //TODO show PL pdf
+                                let v = clientMap.get(no);
+                                let inv = pdfMap.get(no);
+                                let filePath = `./pl ${inv}.pdf`;
+                                if (query === "1") {
+
+                                    let mediaMessage = `${v.name} pl`;
+                                    const media = MessageMedia.fromFilePath(filePath);
+
+                                    client.sendMessage(no, media, { caption: mediaMessage }).catch(console.error);
+                                    messageChain.delete(no);
+                                    visitor.pageview(`/pl/sentpdf`, function (err) {
+                                        if (err) {
+                                            console.error(err);
+                                        }
+                                        // Handle the error if necessary.
+                                        // In case no error is provided you can be sure
+                                        // the request was successfully sent off to Google.
+                                    });
+                                } else if (query === "2") {
+                                    //file removed
+                                    fs.unlink(filePath, (err) => {
+                                        if (err) {
+                                            console.error(err)
+                                            return
+                                        }
+                                        visitor.pageview(`/va/deletepl`, function (err) {
+                                            if (err) {
+                                                console.error(err);
+                                            }
+                                            // Handle the error if necessary.
+                                            // In case no error is provided you can be sure
+                                            // the request was successfully sent off to Google.
+                                        });
+
+
+
+                                    });
+                                    messageToSend = "Thank you, the file is being deleted";
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+
+                                    }).catch(console.error);
+
+                                } else {
+                                    messageToSend = `Please select the options 1 or 2, this is outside of the expected responses`;
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+                                        visitor.pageview(`/pl/notexpected`, function (err) {
+                                            if (err) {
+                                                console.error(err);
+                                            }
+                                            // Handle the error if necessary.
+                                            // In case no error is provided you can be sure
+                                            // the request was successfully sent off to Google.
+                                        });
+                                    }).catch(console.error);
+                                }
+                            } else if (messages[0].substring(messages[0].indexOf('@') + 1, messages[0].length) === "bookyarutso" && messages[0].substring(0, messages[0].indexOf('@')).length === 24) {
+                                messages.push(query);
+                                messageChain.set(no, messages);
+                                messageToSend = "Send the date you want to take the vehicle in the format dd/mm/yyyy e.g 15/12/2022 ";
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                    // console.log("Res " + JSON.stringify(res));
+                                    // visitor.pageview(`/yarutso/book`, function (err) {
+                                    //     if (err) {
+                                    //         console.error(err);
+                                    //     }
+                                    //     // Handle the error if necessary.
+                                    //     // In case no error is provided you can be sure
+                                    //     // the request was successfully sent off to Google.
+                                    // });
+                                }).catch(console.error);
                             } else {
-                                messageToSend = "Please choose on of the options above";
+                                messageToSend = "Please choose one of the options above";
 
                                 client.sendMessage(msg.from, messageToSend).then((res) => {
                                     // console.log("Res " + JSON.stringify(res));
@@ -2377,7 +2245,7 @@ client.on('message', async msg => {
 
                             } else if (messages[1] === "3" && messages[0] === "1073unashe") { // How does it work?
                                 if (query === "1") { // What is hive?
-                                    messageToSend = "Hive is a platform  \n\n*For service providers* \nIt helps them market their services and gives them software tools to improve their services like a chatbot to assist in managing customer services, and managing your business efficiently, and a website to help market your business online \n\n*For people searching for a service* \nIt helps people who are searching for services get them conviniently, excellently and reliably, to use Hive you can use our Whatsapp system on this number.\n\nTo learn more about us check out our website on www.hive.co.zw";
+                                    messageToSend = "Hive is a platform  \n\n*For service providers* \nIt helps them market their services and gives them software tools to improve their services like a chatbot to assist in managing customer services, and managing your business efficiently, and a website to help market your business online example hive website: http://davinsholdings.hive.co.zw/ \n\n*For people searching for a service* \nIt helps people who are searching for services get them conviniently, excellently and reliably, to use Hive you can use our Whatsapp system on this number.\n\nTo learn more about us check out our website on www.hive.co.zw";
                                     visitor.pageview(`/how/whatishive`, function (err) {
                                         if (err) {
                                             console.error(err);
@@ -2497,6 +2365,94 @@ client.on('message', async msg => {
                                         // the request was successfully sent off to Google.
                                     });
                                 }).catch(console.error);
+                            } else if (messages[0] === "yarutso@add") { // Yarutso add vehicle
+                                let milliSecondsSinceEpoch = new Date().valueOf().toString();
+                                if (msg.hasMedia) {
+                                    return firebase.addImage("yarutso", attachmentData.data, milliSecondsSinceEpoch.toString()).then((imageUrl) => {
+
+                                        if (imageUrl === null) {
+                                            messageToSend = `There was an error adding your image picture please try again, if the problem persists try again later`;
+                                            messageChain.delete(no);
+                                            client.sendMessage(msg.from, messageToSend).then((res) => {
+                                                visitor.pageview(`/yarutso/erroraddingpicture`, function (err) {
+                                                    if (err) {
+                                                        console.error(err);
+                                                    }
+                                                    // Handle the error if necessary.
+                                                    // In case no error is provided you can be sure
+                                                    // the request was successfully sent off to Google.
+                                                });
+                                            }).catch(console.error);
+                                        } else {
+                                            var car = new rentalItemModel({
+                                                description: messages[1],
+                                                img: imageUrl,
+                                            });
+
+
+                                            return bookingService.addRentalItem(car).then((v) => {
+
+                                                if (!v.expired) {
+                                                    messageToSend = `Your vehicle has been added, you can add more by clicking this link https://wa.me/${hiveBot}?text=yarutso@add`;
+                                                    // visitor.pageview(`/yarutso/addedvehicle`, function (err) {
+                                                    //     if (err) {
+                                                    //         console.error(err);
+                                                    //     }
+                                                    //     // Handle the error if necessary.
+                                                    //     // In case no error is provided you can be sure
+                                                    //     // the request was successfully sent off to Google.
+                                                    // });
+                                                } else {
+                                                    messageToSend = `It appears you there was an error adding the vehicle please try again, if this persists please contact us by clicking https://wa.me/${contactUs}?text=Hi+Hive+It+appears+there+was+an+error+creating+my+account`;
+                                                    // visitor.pageview(`/yarutso/erroraddinginfo`, function (err) {
+                                                    //     if (err) {
+                                                    //         console.error(err);
+                                                    //     }
+                                                    //     // Handle the error if necessary.
+                                                    //     // In case no error is provided you can be sure
+                                                    //     // the request was successfully sent off to Google.
+                                                    // });
+                                                }
+
+                                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                                }).catch(console.error);
+
+
+                                            }).catch((e) => {
+                                                console.error(e);
+                                                messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
+                                                messageChain.delete(no);
+                                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                                    // console.log("Res " + JSON.stringify(res));
+                                                    visitor.pageview(`/yarutso/erroraddinginfo`, function (err) {
+                                                        if (err) {
+                                                            console.error(err);
+                                                        }
+                                                        // Handle the error if necessary.
+                                                        // In case no error is provided you can be sure
+                                                        // the request was successfully sent off to Google.
+                                                    });
+                                                }).catch(console.error);
+
+                                            });
+                                        }
+
+
+                                    }).catch(console.error);
+                                } else {
+                                    messageToSend = `It appears the picture was not downloaded properly please send the picture again`;
+                                    messageChain.delete(no);
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+                                        visitor.pageview(`/yarutso/erroraddingpicture`, function (err) {
+                                            if (err) {
+                                                console.error(err);
+                                            }
+                                            // Handle the error if necessary.
+                                            // In case no error is provided you can be sure
+                                            // the request was successfully sent off to Google.
+                                        });
+                                    }).catch(console.error)
+                                }
                             } else if (messages[0] === "@service") { // Save service 
 
                                 if (typeof parseInt(query) === "number") {
@@ -2604,6 +2560,111 @@ client.on('message', async msg => {
                                         // the request was successfully sent off to Google.
                                     });
                                     messageToSend = `It appears you did not send the number of items as a number, please send as a number, if this is not what you want, send # to restart`;
+                                }
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                    // console.log("Res " + JSON.stringify(res));
+                                }).catch(console.error);
+                            } else if (messages[0] === "@cost") {
+
+                                if (typeof parseInt(query) === "number") {
+                                    messageChain.delete(no);
+
+                                    let expense = new expenseModel({
+                                        no: no,
+                                        itemDescription: messages[1],
+                                        date: new Date,
+                                        amount: query,
+                                    });
+
+
+                                    stockService.addExpense(expense).then((v) => {
+                                        messageToSend = `Cost added successfully`;
+                                        client.sendMessage(msg.from, messageToSend).then((res) => {
+                                            // console.log("Res " + JSON.stringify(res));
+                                            visitor.pageview(`/addexpense`, function (err) {
+                                                if (err) {
+                                                    console.error(err);
+                                                }
+                                                // Handle the error if necessary.
+                                                // In case no error is provided you can be sure
+                                                // the request was successfully sent off to Google.
+                                            });
+                                        }).catch(console.error);
+                                    }).catch(console.error);
+
+
+                                } else {
+
+                                    messageToSend = `It appears you did not send the cost as a number, please send as a number, if this is not what you want, send # to restart`;
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+                                        // console.log("Res " + JSON.stringify(res));
+                                        visitor.pageview(`/addexpense/ERROR`, function (err) {
+                                            if (err) {
+                                                console.error(err);
+                                            }
+                                            // Handle the error if necessary.
+                                            // In case no error is provided you can be sure
+                                            // the request was successfully sent off to Google.
+                                        });
+                                    }).catch(console.error);
+                                }
+
+
+                            } else if (messages[0] === "@income") {
+
+                                if (typeof parseInt(query) === "number") {
+                                    messageChain.delete(no);
+                                    let income = new incomeModel({
+                                        no: no,
+                                        itemName: messages[1],
+                                        category: "other",
+                                        numberOfItems: 1,
+                                        date: new Date,
+                                        amount: query,
+                                    });
+
+                                    stockService.addIncome(income).then((v) => {
+                                        messageToSend = `Income added successfully`;
+                                        client.sendMessage(msg.from, messageToSend).then((res) => {
+                                            // console.log("Res " + JSON.stringify(res));
+                                            visitor.pageview(`/addincome`, function (err) {
+                                                if (err) {
+                                                    console.error(err);
+                                                }
+                                                // Handle the error if necessary.
+                                                // In case no error is provided you can be sure
+                                                // the request was successfully sent off to Google.
+                                            });
+                                        }).catch(console.error);
+                                    }).catch(console.error);
+
+
+                                } else {
+                                    messageToSend = `It appears you did not send the income amount as a number, please send as a number, if this is not what you want, send # to restart`;
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+                                        // console.log("Res " + JSON.stringify(res));
+                                        visitor.pageview(`/addincome/ERROR`, function (err) {
+                                            if (err) {
+                                                console.error(err);
+                                            }
+                                            // Handle the error if necessary.
+                                            // In case no error is provided you can be sure
+                                            // the request was successfully sent off to Google.
+                                        });
+                                    }).catch(console.error);
+                                }
+
+                            } else if (messages[0].substring(messages[0].indexOf('@') + 1, messages[0].length) === "bookyarutso" && messages[0].substring(0, messages[0].indexOf('@')).length === 24) {
+
+                                let dateArray = query.split("/");
+                                let date1 = new Date(dateArray[2], dateArray[1] - 1, dateArray[0]);
+                                if (getDaysDifference(new Date(), date1) > -1 && getDaysDifference(new Date(), date1) < 366) {
+                                    messages.push(date1);
+                                    messageChain.set(no, messages);
+                                    messageToSend = "Please send the date you would like to return the vehicle,  in the format dd/mm/yyyy  e.g 30/03/2022"
+                                } else {
+                                    messageToSend = "It appears you selected a date that is not in the correct format, please send again in the format dd/mm/yyyy  e.g 30/03/2022"
+
                                 }
                                 client.sendMessage(msg.from, messageToSend).then((res) => {
                                     // console.log("Res " + JSON.stringify(res));
@@ -2786,7 +2847,7 @@ client.on('message', async msg => {
                                         // the request was successfully sent off to Google.
                                     });
                                 } else if (query === "5") {
-                                    messageToSend = "Hive landing page is a online site for your services only available for businesses, it would be found on [yourname].hive.co.zw , and is really a website without the extra costs of a domain and hosting, and new ways of showing your website will be added weekly, it helps you increase your market reach, and attract more clients to your business";
+                                    messageToSend = "Hive landing page is a online site for your services only available for businesses, it would be found on [yourname].hive.co.zw example business already using our service http://davinsholdings.hive.co.zw/, and is really a website without the extra costs of a domain and hosting, and new ways of showing your website will be added weekly, it helps you increase your market reach, and attract more clients to your business";
                                     visitor.pageview(`/faqs/whatisalandingpage`, function (err) {
                                         if (err) {
                                             console.error(err);
@@ -3163,7 +3224,65 @@ client.on('message', async msg => {
                             client.sendMessage(msg.from, messageToSend).then((res) => {
                                 // console.log("Res " + JSON.stringify(res));
                             }).catch(console.error);
+                        } else if (messages[0].substring(messages[0].indexOf('@') + 1, messages[0].length) === "bookyarutso" && messages[0].substring(0, messages[0].indexOf('@')).length === 24) {
+                            let dateArray = query.split("/");
+                            let finalBookedDate = new Date(dateArray[2], dateArray[1] - 1, dateArray[0]);
+                            let isAvailableDates = true;
+                            if (getDaysDifference(new Date(), finalBookedDate) > -1 || getDaysDifference(new Date(), finalBookedDate) < 366) {
 
+                                if(clientMap.has(no)){
+                                    for (let i = 0; i < clientMap.get(no).length; i++) {
+                                        const element = clientMap.get(no)[i];
+                                        if (dayOfYear(element.dateOfBooking) > dayOfYear(messages[2]) && dayOfYear(element.dateOfReturn) < dayOfTheYear(messages[2])
+                                            || dayOfYear(element.dateOfBooking) > dayOfYear(finalBookedDate) && dayOfYear(element.dateOfReturn) < dayOfTheYear(finalBookedDate)) {
+                                            messageToSend = `It appears you chose dates that the vehicle has already been booked, please retry, to retry click this link and send https://wa.me/${hiveBot}?text=yarutsocarrental@va`;
+                                            messageChain.delete(no);
+                                            isAvailableDates = false;
+                                            return client.sendMessage(no, messageToSend).catch(console.error);
+                                        }
+    
+                                    }
+    
+                                }
+                                
+                                if (isAvailableDates) {
+                                    let id = messages[0].substring(0, messages[0].indexOf('@'));
+                                    bookingService.getItem(id).then((r) => {
+                                        let mess = `${messages[1]} using this phone number ${no.substring(0, no.indexOf('@c.us'))} has just booked a ${r.description} from ${messages[2]} to ${finalBookedDate}`;
+
+                                        let newBooking = new itemBooked({
+                                            name: messages[1],
+                                            description: r.description,
+                                            itemId: id,
+                                            dateAdded: new Date,
+                                            dateOfReturn: finalBookedDate,
+                                            bookerId: no,
+                                            bookerName: messages[1],
+                                            dateOfBooking: messages[2],
+                                            company: "yarutso car rental"
+                                        });
+                                        client.sendMessage(`263713120606@c.us`, mess).catch(console.error);
+
+                                        bookingService.bookItem(newBooking).then((v) => {
+                                            messageToSend = `Booking was successful`;
+                                            messageChain.delete(no);
+                                            client.sendMessage(no, messageToSend).catch(console.error);
+
+
+                                        }).catch(console.error);
+                                    });
+
+
+                                }
+
+
+
+                            } else {
+                                messageToSend = "It appears you selected a date that is not in the correct format, please send again in the format dd/mm/yyyy  e.g 30/03/2022"
+                            }
+                            client.sendMessage(msg.from, messageToSend).then((res) => {
+                                // console.log("Res " + JSON.stringify(res));
+                            }).catch(console.error);
                         } else { // outside of expected responses
                             messageToSend = "This response is out of the expected one, this chat has been restarted, send hi to choose the option you want";
                             messageChain.delete(no);
@@ -3484,7 +3603,7 @@ client.on('message', async msg => {
                                     break;
                             }
 
-                            var worker = new Worker({
+                            var worker = new workerModel({
                                 brief: messages[1],
                                 skills: messages[2],
                                 category: category,
@@ -3548,7 +3667,7 @@ client.on('message', async msg => {
                                 return firebase.addImage(urlName, attachmentData.data, milliSecondsSinceEpoch.toString()).then((imageUrl) => {
 
                                     if (imageUrl === null) {
-                                        messageToSend = `There was an error adding your image picture please try again, if the problem persists try again later, https://wa.me/${hiveBot}?text=@pic`;
+                                        messageToSend = `There was an error adding your image picture please try again, if the problem persists try again later`;
                                         messageChain.delete(no);
                                         client.sendMessage(msg.from, messageToSend).then((res) => {
                                             visitor.pageview(`/believeeducation/erroraddingpicture`, function (err) {
@@ -3969,7 +4088,7 @@ client.on('message', async msg => {
 
 
                             if (messages[2] === "1") {
-                                var worker = new Worker({
+                                var worker = new workerModel({
                                     name: messages[3].toLowerCase(),
                                     category: category,
                                     skills: messages[5],
@@ -3993,7 +4112,7 @@ client.on('message', async msg => {
                                 });
                             } else if (messages[2] === "2") {
                                 messageChain.delete(no);
-                                var worker = new Worker({
+                                var worker = new workerModel({
                                     name: messages[3].toLowerCase(),
                                     category: category,
                                     skills: messages[5],
@@ -4019,7 +4138,7 @@ client.on('message', async msg => {
                             mongoWorker.saveWorker(worker).then((v) => {
 
                                 if (!v.expired) {
-                                    messageToSend = `Thank you for your patience, You account has been added to see all the available features for you send the keyword @instructions, or click the link https://263714020524?text=@instructions`;
+                                    messageToSend = `Thank you for your patience, Your account has been added to see all the available features for you send the keyword @instructions, or click the link https://wa.me/${hiveBot}?text=@instructions`;
 
                                 } else {
                                     messageToSend = `It appears you there was an error saving your profile, could it be, that there is already an account saved on this account? If not, kindly try again later, but if the error persists, please contact us by clicking https://wa.me/${contactUs}?text=Hi+Hive+It+appears+there+was+an+error+creating+my+account`;
@@ -4170,6 +4289,644 @@ const isValidPhoneNumber = p => {
     return false;
 }
 
+const checkMessagesWithoutReplies = async () => {
+    try {
+        const chats = await client.getChats();
+
+
+
+        chats.forEach((chat) => {
+            if (chat.unreadCount > 0) {
+                chat.fetchMessages({ limit: chat.unreadCount }).then((unreadMessages) => {
+                    let query = unreadMessages[0].body;
+                    let no = chat.id._serialized;
+                    let messages = [];
+
+                    // Initialise visitor analytics
+                    var visitor = ua('UA-203224382-1', no, { strictCidFormat: false });
+
+                    if (query.substring(query.indexOf("@"), query.length).toLowerCase() === "@va" && query.includes("@va") && query.substring(0, query.indexOf("@va")) !== "add") { // Virtual Assistant channel
+                        let businessName = query.toLowerCase().substring(0, query.toLowerCase().indexOf("@va"));
+
+                        mongoWorker.checkName(businessName).then((r) => {
+                            if (r === null) {
+                                messageToSend = `Hi there!, it appears that Virtual Assistant is no longer operational, kindly contact the person who gave you the link to find out if it is still operational`;
+                                visitor.pageview(`/va/initialize/${r.name}`, function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            } else {
+                                clientMap.set(no, r);
+                                messages.push(query);
+                                messageChain.set(no, messages);
+                                if (businessName.toLowerCase().replace(/\s/g, '') === "believeeducation") {
+                                    let options = {
+                                        unsafeMime: true,
+                                    }
+                                    return MessageMedia.fromUrl(r.pic, options).then((media) => {
+                                        var mess = "Welcome to Believe Eduaction, please send through your question";
+                                        client.sendMessage(msg.from, media, { caption: mess }).catch(console.error);
+                                        visitor.pageview(`/believeeducation/initialize`, function (err) {
+                                            if (err) {
+                                                console.error(err);
+                                            }
+                                            // Handle the error if necessary.
+                                            // In case no error is provided you can be sure
+                                            // the request was successfully sent off to Google.
+                                        });
+                                    }).catch(console.error);
+
+                                } else {
+                                    messageToSend = `Hi there ${r.name}!, welcome to ${businessName}'s Virtual Assistant \n\n \n*1* About ${businessName} \n*2* See services \n*3* Frequently asked questons   \n\nSend the number of the option you want, e.g send 2 if you want to see ${businessName}'s services`;
+                                }
+
+
+                            }
+                            client.sendMessage(no, messageToSend).then((res) => {
+
+                            }).catch(console.error);
+                        }).catch(console.error);
+
+
+
+                    } else if (query === "#") { // Restart coversation
+                        messageToSend = "You have restarted.\nType hi message to continue or click link below \nhttps://wa.me/263713020524?text=hie";
+
+                        client.sendMessage(no, messageToSend).then((res) => {
+                            // console.log("Res " + JSON.stringify(res));
+                            visitor.pageview(`/restart`, function (err) {
+                                if (err) {
+                                    console.error(err);
+                                }
+                                // Handle the error if necessary.
+                                // In case no error is provided you can be sure
+                                // the request was successfully sent off to Google.
+                            });
+                        }).catch((e) => {
+                            console.error(e);
+                            messageToSend = "Oooops looks like there was an error, please try again, by sending a new message ";
+
+                            client.sendMessage(no, messageToSend).then((res) => {
+                                // console.log("Res " + JSON.stringify(res));
+                                visitor.pageview(`/errorsendingmessage`, function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            }).catch((console.error));
+                        });
+                    } else if (query.substring(query.indexOf('@') + 1, query.length) === "profile" && query.substring(0, query.indexOf('@')).length === 13) { // See Profile
+                        // See profile
+
+                        if (query.toLocaleLowerCase() === "@profile") {
+                            mongoWorker.getWorker(no).then((v) => {
+
+                                if (typeof v.urlName === "undefined") {
+                                    messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas}`;
+                                    client.sendMessage(msg.from, messageToSend).then((v) => {
+                                        visitor.pageview(`/profile/${v.name}`, function (err) {
+                                            if (err) {
+                                                console.error(err);
+                                            }
+                                            // Handle the error if necessary.
+                                            // In case no error is provided you can be sure
+                                            // the request was successfully sent off to Google.
+                                        });
+                                    }).catch(console.error);
+                                } else {
+                                    let website = "";
+                                    if (v.package === "7.99") {
+                                        website = `_Website_: ${v.url}`;
+                                    }
+                                    let options = {
+                                        unsafeMime: true,
+                                    }
+
+                                    if (typeof v.pic === "undefined") {
+                                        messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} \nTo chat to their Chatbot(Virtual Assistant) click \nhttps://wa.me/263713020524?text=${v.urlName}@va   \n${website}`;
+                                        client.sendMessage(msg.from, messageToSend).then((v) => {
+                                            visitor.pageview(`/profile/${v.name}`, function (err) {
+                                                if (err) {
+                                                    console.error(err);
+                                                }
+                                                // Handle the error if necessary.
+                                                // In case no error is provided you can be sure
+                                                // the request was successfully sent off to Google.
+                                            });
+                                        }).catch(console.error);
+                                    } else {
+                                        return MessageMedia.fromUrl(v.pic, options).then((media) => {
+                                            messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} \nTo chat to their Chatbot(Virtual Assistant) click \nhttps://wa.me/263713020524?text=${v.urlName}@va   \n${website}`;
+                                            client.sendMessage(msg.from, media, { caption: messageToSend }).then((v) => {
+                                                visitor.pageview(`/profile/media/${v.name}`, function (err) {
+                                                    if (err) {
+                                                        console.error(err);
+                                                    }
+                                                    // Handle the error if necessary.
+                                                    // In case no error is provided you can be sure
+                                                    // the request was successfully sent off to Google.
+                                                });
+                                            }).catch(console.error);
+                                        }).catch(console.error);
+                                    }
+                                }
+
+                            }).catch(console.error);
+                        } else {
+                            var id = query.substring(0, query.indexOf('@'));
+                            mongoWorker.getWorkerById(id).then((v) => {
+
+                                if (typeof v.urlName === "undefined") {
+                                    mongoWorker.removeBids(v.bids, v.no).catch(console.error);
+                                    messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} \n_Contact_: https://wa.me/${v.no.substring(0, v.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Hive+I+am+interested+in+your+services`;
+                                    client.sendMessage(msg.from, messageToSend).catch(console.error);
+                                    visitor.pageview(`/profile/freelancer/${v.name}`, function (err) {
+                                        if (err) {
+                                            console.error(err);
+                                        }
+                                        // Handle the error if necessary.
+                                        // In case no error is provided you can be sure
+                                        // the request was successfully sent off to Google.
+                                    });
+                                    let mess = `Number ending ${no.substring(no.indexOf("@c.us") - 3, no.indexOf("@c.us"))} just viewed your profile`;
+                                    client.sendMessage(v.no, mess).catch(console.error);
+
+                                } else {
+                                    let website = "";
+                                    if (v.package === "7.99") {
+                                        website = `_Website_: ${v.url}`;
+                                    }
+                                    let options = {
+                                        unsafeMime: true,
+                                    }
+
+                                    if (typeof v.pic === "undefined") {
+                                        messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} \nTo chat to their Chatbot(Virtual Assistant) click \nhttps://wa.me/263713020524?text=${v.urlName}@va   \n${website} \n_Contact_: https://wa.me/${v.no.substring(0, v.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Hive+I+am+interested+in+your+services`;
+                                        client.sendMessage(msg.from, messageToSend).catch(console.error);
+                                        visitor.pageview(`/profile/business/nopic/${v.name}`, function (err) {
+                                            if (err) {
+                                                console.error(err);
+                                            }
+                                            // Handle the error if necessary.
+                                            // In case no error is provided you can be sure
+                                            // the request was successfully sent off to Google.
+                                        });
+                                        let mess = `Number ending ${no.substring(no.indexOf("@c.us") - 3, no.indexOf("@c.us"))} just viewed your profile`;
+                                        client.sendMessage(v.no, mess).catch(console.error);
+                                    } else {
+
+                                        let mess = `Number ending ${no.substring(no.indexOf("@c.us") - 3, no.indexOf("@c.us"))} just viewed your profile`;
+                                        client.sendMessage(v.no, mess).catch(console.error);
+                                        visitor.pageview(`/profile/business/${v.name}`, function (err) {
+                                            if (err) {
+                                                console.error(err);
+                                            }
+                                            // Handle the error if necessary.
+                                            // In case no error is provided you can be sure
+                                            // the request was successfully sent off to Google.
+                                        });
+                                        return MessageMedia.fromUrl(v.pic, options).then((media) => {
+                                            messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} \nTo chat to their Chatbot(Virtual Assistant) click \nhttps://wa.me/263713020524?text=${v.urlName}@va   \n${website} \n_Contact_: https://wa.me/${v.no.substring(0, v.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Hive+I+am+interested+in+your+services`;
+                                            client.sendMessage(msg.from, media, { caption: messageToSend }).catch(console.error);
+
+                                        }).catch(console.error);
+                                    }
+                                }
+
+
+
+
+
+
+
+                            }).catch((e) => {
+                                console.log(e);
+                                messageToSend += "Oooops looks like there was an error, please try again, by sending a new message ";
+                                client.sendMessage(msg.from, media, { caption: messageToSend }).then((v) => {
+                                    visitor.pageview(`/profile/errorshowing`, function (err) {
+                                        if (err) {
+                                            console.error(err);
+                                        }
+                                        // Handle the error if necessary.
+                                        // In case no error is provided you can be sure
+                                        // the request was successfully sent off to Google.
+                                    });
+                                }).catch(console.error);
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                    // console.log("Res " + JSON.stringify(res));
+                                }).catch(console.error);
+                            });
+                        }
+                    } else if (query.toLowerCase() === "@subscribe") { // subscribe to service
+
+                        messages.push(query);
+                        messageChain.set(no, messages);
+                        messageToSend = "Please select the package you would like to subscribe to \n\n \n*1* Gold Package 7.99USD p.m (Profile , Virtual Assistant and Web page)  \n*2* Platinum Package (Custom solution to improve your services)  \n\nTo choose any option send a number eng. 1 to get pay for a Profile, Virtual Assistant and a Web page \n\nTerms and Conditions Apply, to see them send Terms or click this link https://wa.me/263713020524?text=terms";
+
+                        client.sendMessage(no, messageToSend).then((res) => {
+                            // console.log("Res " + JSON.stringify(res));
+                            visitor.pageview("/subscribe/initialize", function (err) {
+                                if (err) {
+                                    console.error(err);
+                                }
+                                // Handle the error if necessary.
+                                // In case no error is provided you can be sure
+                                // the request was successfully sent off to Google.
+                            });
+                        }).catch((console.error));
+                    } else if (query.toLowerCase() === "terms") { // See Terms
+
+                        var mediaMessage = "Hive Terms and Conditions";
+                        const media = MessageMedia.fromFilePath('./t&cs.pdf');
+
+                        client.sendMessage(no, media, { caption: mediaMessage }).catch(console.error);
+                        client.sendMessage(no, mediaMessage).then((res) => {
+                            // console.log("Res " + JSON.stringify(res));
+                            visitor.pageview("/terms", function (err) {
+                                if (err) {
+                                    console.error(err);
+                                }
+                                // Handle the error if necessary.
+                                // In case no error is provided you can be sure
+                                // the request was successfully sent off to Google.
+                            });
+                        }).catch((console.error));
+                    } else if (query.substring(query.indexOf('@') + 1, query.length) === "portfolio" && query.includes("@portfolio")) { // See portfolio
+
+                        mongoWorker.getWorker(no).then((v) => {
+                            if (v === null) {
+
+                                messageToSend = "It appears this user is yet to create an account, only registered people can add their portfolio pictures";
+                                visitor.pageview("/addportfolio/noaccount", function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            } else {
+                                messages.push(query);
+                                messageChain.set(no, messages);
+                                clientMap.set(no, v);
+                                messageToSend = "You want to add to your portfolio which showcases the work you have done, great, we take one picture per description, we advise you to post *only the best pictures*";
+                                visitor.pageview("/addportfolio/initialize", function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            }
+                            client.sendMessage(no, messageToSend).then((res) => {
+                                // console.log("Res " + JSON.stringify(res));
+                            }).catch((console.error));
+                        }).catch(console.error);
+                    } else if (query.substring(query.indexOf('@') + 1, query.length) === "pic") {
+
+                        mongoWorker.getWorker(no).then((v) => {
+                            if (v === null) {
+
+                                messageToSend = "It appears this user is yet to create an account, only registered people can add their profile pictures";
+                                visitor.pageview("/addpic/noaccount", function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            } else {
+                                messages.push(query);
+                                messageChain.set(no, messages);
+                                clientMap.set(no, v);
+                                messageToSend = "You want to add your picture, great, send your picture now";
+                                visitor.pageview("/addpic/initialize", function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            }
+                            client.sendMessage(no, messageToSend).then((res) => {
+                                // console.log("Res " + JSON.stringify(res));
+                            }).catch((console.error));
+                        }).catch(console.error);
+
+                    } else if (query.substring(query.indexOf('@') + 1, query.length) === "rate" && query.includes("@rate")) { // rate or put recommendations
+
+                        let username = query.substring(0, query.indexOf('@'));
+                        mongoWorker.checkName(username).then((v) => {
+
+                            if (v === null) {
+                                messageToSend += `We do not appear to have this user in our database, please ask them again, and try again`;
+                                visitor.pageview("/rate/noaccount", function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            } else {
+                                messages.push(query.toLowerCase());
+                                messageChain.set(no, messages);
+                                messageToSend += `Thank you for rating the service you got, on a scale of 1 to 5, how would you rate the service you got, you can only type a number between 1 and 5`;
+                                visitor.pageview("/rate/initialize", function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            }
+                            client.sendMessage(no, messageToSend).then((res) => {
+
+                            }).catch(console.error);
+
+                        }).catch(console.error);
+                    } else if (query.toLowerCase() === "addva") {
+
+                        mongoWorker.getWorker(no).then((v) => {
+                            if (v === null) {
+                                messageToSend = `It appears you are yet to create an account, create an account today, by selecting option 2, on the welcome message, send any message now to get to the main page`;
+                                visitor.pageview("/addva/noaccount", function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            } else {
+                                clientMap.set(no, v);
+                                messages.push(query.toLowerCase());
+                                messageChain.set(no, messages);
+                                messageToSend = `Add your Chatbot(Virtual Assistant) \nPlease list all your services and the price for each separated by a semicolon in this format descr=amount and send them, all the you services listed above \ne.g website deveopmen=100USD; Mobile Application development=300USD \nOR \nMoving goods local(in town)=10USD;Moving goods above 2T=45USD \nOR \nPedicure=7USD,Manicure=10USD \n\nIf you need to Edit your Chatbot (Virtual Assistant) click this link https://wa.me/${hiveBot}?text=addva`;
+                                visitor.pageview("/addva/initialize", function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            }
+                            client.sendMessage(no, messageToSend).then((res) => {
+
+                            }).catch(console.error);
+                        }).catch(console.error);
+                    } else if (query.toLowerCase() === "@update") {
+
+                        mongoWorker.getWorker(no).then((v) => {
+                            if (v === null) {
+                                messageToSend = `It appears you are yet to create an account, create an account today, by selecting option 2, on the welcome message, send any message now to get to the main page`;
+                                visitor.pageview("/update/noaccount", function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            } else {
+                                clientMap.set(no, v);
+                                messages.push(query.toLowerCase());
+                                messageChain.set(no, messages);
+                                visitor.pageview("/update/initialize", function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                                messageToSend = `Hie ${v.name} , you want to update your account, you can not change your name, however you can update on other things, for your Chatbot(Virtual Assistant) click this link to update it https://wa.me/263713020524?text=addva \n\nPlease type your updated intro about yourself`;
+                            }
+                            client.sendMessage(no, messageToSend).then((res) => {
+
+                            }).catch(console.error);
+                        }).catch(console.error);
+                    } else if (query.toLowerCase() === "believeeducation@add") { // Believe education auth and ask for info
+
+                        mongoWorker.getWorker(no).then((v) => {
+                            if (v.urlName === "lionelchidzivabelieveeducationpvtltd") {
+                                clientMap.set(no, v);
+                                messages.push(query.toLowerCase());
+                                messageChain.set(no, messages);
+                                messageToSend = `Hie ${v.name} , you are about to add information for your students, please answer the next few questions. Please type the information your want to add e.g `;
+                            } else {
+                                messageToSend = `You do not have access to add information to this account`;
+
+                            }
+                            client.sendMessage(no, messageToSend).then((res) => {
+                                visitor.pageview("/welcomemessage", function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            }).catch(console.error);
+                        }).catch(console.error);
+                    } else if (query.toLowerCase() === "@addstock") { // Add stock name
+
+                        mongoWorker.getWorker(no).then((v) => {
+                            if (typeof v.urlName === "undefined" || v.expired) {
+
+                                if (v.expired) {
+                                    messageToSend = `Your account expired, please renew to continue enjoying the full benefits https://wa.me/${hiveBot}?text=@subscribe`;
+                                } else {
+                                    messageToSend = `Only businesses can add stock`;
+                                }
+
+                            } else {
+                                messages.push(query);
+                                messageChain.set(no, messages);
+                                messageToSend = `Hie ${v.name} , You are about to add stock, what is the name of item, \n\nN.B Ensure you put in a name you can remember which you will use to confirm it has been bought`;
+                            }
+                            client.sendMessage(msg.from, messageToSend).then((res) => {
+                                visitor.pageview(`/addstock/${v.name}`, function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            }).catch(console.error);
+                        }).catch(console.error);
+
+
+                    } else if (query.toLowerCase() === "@stock") { // View stock
+
+                        stockService.seeAvailableStock(no).then((v) => {
+                            if (v.length > 0) {
+
+                                messages.push(query);
+                                messageChain.set(no, messages);
+                                clientMap.set(no, v);
+                                messageToSend = `How would you like to see your stock report, \n\n*1* Pdf format(Looks better this way) \n*2* As a normal message`;
+                                var stock = {};
+
+                                var uniqueID = new Date().getTime().toString();
+                                stock.name = `stock ${uniqueID}`;
+                                pdfMap.set(no, uniqueID);
+
+                                stock.dueDate = `${new Date().getMonth() + 1}/${new Date().getDate()}/${new Date().getFullYear()}`;
+                                let stockItems = [];
+                                let subtotal = 0;
+                                for (let index = 0; index < v.length; index++) {
+
+                                    stockItems.push({
+                                        description: v[index].visibleName,
+                                        quantity: v[index].numberOfItems,
+                                        price: v[index].itemPrice,
+                                        amount: v[index].itemPrice * v[index].numberOfItems,
+                                    });
+                                    subtotal += (v[index].itemPrice * v[index].numberOfItems);
+
+
+                                }
+                                stock.items = stockItems;
+                                stock.subtotal = subtotal;
+                                const stockGenerator = new StockGenerator(stock);
+
+                                stockGenerator.generate();
+                            } else {
+                                messageToSend = `It appears you have no stock available`;
+                            }
+                            client.sendMessage(msg.from, messageToSend).then((res) => {
+                                visitor.pageview(`/seestock/${v.name}`, function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            }).catch(console.error);
+                        }).catch(console.error);
+                    } else if (query.toLowerCase() === "@addstockmember") { // Add someone else to be able to see what is going on 
+
+                        stockService.seeAvailableStock(no).then((v) => {
+                            if (v.length > 0) {
+                                clientMap.set(no, v);
+                                messages.push(query);
+                                messageChain.set(no, messages);
+                                messageToSend = `Please send the number of the person you want to add to be able to view the stock in the format 0712345678`;
+                            } else {
+                                messageToSend = `It appears you have no stock available`;
+                            }
+                            client.sendMessage(msg.from, messageToSend).then((res) => {
+                                visitor.pageview(`/addstockmember/${v.name}`, function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            }).catch(console.error);
+                        }).catch(console.error);
+                    } else if (query.includes("@sold")) { // Confirm sold item keyword laptop@sold12
+
+                        let itemName = query.substring(0, query.indexOf("@sold"));
+                        let numberOfItems = parseInt(query.substring(query.indexOf("@sold") + 5, query.length));
+                        if (typeof parseInt(numberOfItems) === "number") {
+
+                            stockService.removeFromAvailableStock(no, itemName, numberOfItems).then((r) => {
+                                if (r.no === no) {
+                                    messageToSend = "Transation added successfully";
+                                } else if (r === null) {
+                                    messageToSend = "It appears you entered a stock name you do not have please check the spelling again and send, please use the format [item name]@sold[number of items sold] e.g laptop@sold11";
+                                } else if (r === 0) {
+                                    messageToSend = "It appears you entered a stock name that has since finished,Ensure you update if you have new stock ";
+                                }
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                    visitor.pageview(`/itemssold`, function (err) {
+                                        if (err) {
+                                            console.error(err);
+                                        }
+                                        // Handle the error if necessary.
+                                        // In case no error is provided you can be sure
+                                        // the request was successfully sent off to Google.
+                                    });
+                                }).catch(console.error);
+                            }).catch(console.error);
+
+                        } else {
+                            messageToSend = "The number of items sold are not clear, please use the format [item name]@sold[number of items sold] e.g laptop@sold11";
+                            client.sendMessage(msg.from, messageToSend).then((res) => {
+                                visitor.pageview(`/wrongnumberofitemssolds`, function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            }).catch(console.error);
+                        }
+                    } else {
+
+                        // user has not communicated yet, welcome them
+
+                        messages.push("1073unashe");
+                        messageChain.set(no, messages);
+                        var timeOfDay = "";
+                        if (new Date().getHours() < 12) {
+                            timeOfDay = "Morning";
+                        } else if (new Date().getHours() > 12 && new Date().getHours() < 16) {
+                            timeOfDay = "Afternoon";
+                        } else {
+                            timeOfDay = "Day";
+                        }
+
+                        messageToSend = `Pleasant ${timeOfDay}, welcome to Hive \n\n \n*1* Search for a service \n*2* Register \n*3* How does this work?   \n\nSend the number of the option you want, e.g send 2 if you want to register as a service provider`;
+
+                        client.sendMessage(no, messageToSend).then((res) => {
+                            visitor.pageview("/welcomemessage", function (err) {
+                                if (err) {
+                                    console.error(err);
+                                }
+                                // Handle the error if necessary.
+                                // In case no error is provided you can be sure
+                                // the request was successfully sent off to Google.
+                            });
+                        }).catch(console.error);
+
+
+
+                    }
+
+
+
+
+
+
+                }).catch(console.error);
+            }
+
+        });
+    } catch (error) {
+        console.error(error);
+    }
+
+}
+
 const getAllPeopleWhoMessagedUs = async () => {
 
     var chats = await client.getChats();
@@ -4180,6 +4937,54 @@ const getAllPeopleWhoMessagedUs = async () => {
         //     client.sendMessage(elem.id._serialized, "Introducting Gigz, connecting people building dreams, there was a network error, please restart by typing hie").catch(console.error);
         // }
     });
+
+
+
+}
+
+// Get month
+const showMonth = (number) => {
+
+    switch (number + 1) {
+        case 1:
+            return "January";
+        case 2:
+            return "February";
+        case 3:
+            return "March";
+        case 4:
+            return "April";
+        case 5:
+            return "May";
+        case 6:
+            return "June";
+        case 7:
+            return "July";
+        case 8:
+            return "August";
+        case 9:
+            return "September";
+        case 10:
+            return "October";
+        case 11:
+            return "November";
+        case 12:
+            return "December";
+        default:
+            break;
+    }
+}
+
+// Get day difference
+function getDaysDifference(d1, d2) {
+    var date1 = new Date(d1);
+    var date2 = new Date(d2);
+
+    // To calculate the time difference of two dates
+    var Difference_In_Time = date2.getTime() - date1.getTime();
+
+
+    return parseInt(Difference_In_Time / (1000 * 3600 * 24))
 
 
 

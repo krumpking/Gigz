@@ -1,5 +1,4 @@
 const AnswerModel = require('../models/answerModel');
-var Gig = require('../models/gigModel');
 
 module.exports = {
     addAnswer: function (answer) {

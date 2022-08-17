@@ -5,6 +5,7 @@ var IncomeSchema = new Schema({
     no: { type: String, required: true },
     itemName: { type: String, required: true },
     numberOfItems: { type: Number, required: true },
+    category: {type: String},
     date: { type: Date, required: true },
     amount: { type: Number, required: true },
 });
