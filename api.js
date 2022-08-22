@@ -89,11 +89,12 @@ var pollUrl = "";
 var seenProfilesMap = new Map();
 var clientMap = new Map();
 var pdfMap = new Map();
+var rentalItemMap = new Map();
 var attachmentData = {};
 const contactUs = "263719066282";
 const hiveBot = "263713020524";
 var messagesSentNoMap = new Map();
-
+const restart = 'If this is not what you want send # to restart';
 
 
 client.on('ready', async () => {
@@ -247,7 +248,7 @@ client.on('message', async msg => {
 
                     } else {
 
-                        messageToSend = `Hi there ${name}!, welcome to ${businessName}'s Virtual Assistant \n\n \n*1* About ${businessName} \n*2* See services \n*3* Frequently asked questons   \n\nSend the number of the option you want, e.g send 2 if you want to see ${businessName}'s services`;
+                        messageToSend = `Hi there ${name}!, welcome to ${businessName}'s Virtual Assistant \n\n \n*1* About ${businessName} \n*2* See services \n*3* Frequently asked questions   \n\nSend the number of the option you want, e.g send 2 if you want to see ${businessName}'s services`;
                         client.sendMessage(msg.from, messageToSend).then((res) => {
                             visitor.pageview(`/va/${businessName}`, function (err) {
                                 if (err) {
@@ -440,7 +441,7 @@ client.on('message', async msg => {
             messageChain.delete(no); //Ensure all previous messages are deleted
             messages.push("@subscribe");
             messageChain.set(no, messages);
-            messageToSend = "Please select the package you would like to subscribe to \n\n \n*1* Gold Package 7.99USD p.m (Profile , Virtual Assistant and Web page)  \n*2* Platinum Package (Custom solution to improve your services)  \n\nTo choose any option send a number eng. 1 to get pay for a Profile, Virtual Assistant and a Web page \n\nTerms and Conditions Apply, to see them send Terms or click this link https://wa.me/263713020524?text=terms";
+            messageToSend = "Please select the package you would like to subscribe to \n\n \n*1* Gold Package 7.99USD per month  \n*2* Platinum Package 84USD per year  \n\nTo choose any option send a number eng. 1 to get pay for a Profile, Virtual Assistant and a Web page \n\nTerms and Conditions Apply, to see them send Terms or click this link https://wa.me/263713020524?text=terms";
 
             client.sendMessage(msg.from, messageToSend).then((res) => {
                 // console.log("Res " + JSON.stringify(res));
@@ -638,12 +639,13 @@ client.on('message', async msg => {
         } else if (query.toLowerCase() === "@instructions") {
             messageChain.delete(no);
             mongoWorker.getWorker(no).then((v) => {
-                console.log(typeof v.urlName);
-                console.log(typeof v.url);
                 if (typeof v.urlName !== "undefined" && typeof v.url !== "undefined") {
-                    messageToSend = `Hie ${v.name} , here are the options you have as a business account holder, use these keywords to help you use your Hive account to its fullest potential \n\nkeyword @service to add your services \n\nkeyword @faq to add frequently asked questions \n\nkeyword @portfolio to add work done before \n\nkeyword @pic to add your main display picture for your hive website \n\nkeyword @update to update your account information \n\nkeyword @subscribe to subscribe  \n\nkeyword @profile to see your profile`;
+                    messages.push(query);
+                    clientMap.set(no, v);
+                    messageChain.set(no, messages);
+                    messageToSend = `Hie ${v.name} , here are the options you have as a business account holder, Please select the options you want to see \n\n*1* Hive Landing Page instructions \n*2* Virtual Assistant(Chatbot)  \n*3* Book keeping and stock management \n*4* Other`;
                 } else {
-                    messageToSend = `Hie ${v.name} , here are some important keywords you can take advantage of \n\nkeyword @profile to see your profile \n\nkeyword @update to update your account \n\nkeyword @terms to see Hive Terms and Conditions`;
+                    messageToSend = `Hie ${v.name} , here are some important keywords you can take advantage of \n\nTo update your profile \n${messageLink(hiveBot, '@update')} \n\nTo see your profile \n${messageLink(hiveBot, '@profile')}  \n\nTo see Hive Terms and Conditions \n${messageLink(hiveBot, '@terms')}`;
                 }
                 client.sendMessage(msg.from, messageToSend).then((res) => {
                     visitor.pageview(`/instructions/${v.name}`, function (err) {
@@ -1030,43 +1032,54 @@ client.on('message', async msg => {
             messages.push(query);
             messageChain.set(no, messages);
             var id = query.substring(0, query.indexOf('@'));
-            bookingService.checkBooking(id).then((r) => {
+            bookingService.getItem(id).then((v) => {
+                rentalItemMap.set(no, v);
 
-                
-                if (r.length > 0) {
-                    clientMap.set(no, r);
-                    var mess = `You are about to book the car above, it is available now, but it booked on the follow dates,`
-                    for (let index = 0; index < r.length; index++) {
-                        const element = r[index];
-                        let d = new Date(r[index].dateOfBooking);
-                        let fD = new Date(r[index].dateOfReturn);
-                        let dateNoLongerAvailable = d.getDay() + " " + showMonth(d.getMonth()) + " " + d.getFullYear();
-                        let dateLaterAvailable = fD.getDay() + " " + showMonth(fD.getMonth()) + " " + fD.getFullYear();
-                        mess += `\n\nFrom ${dateNoLongerAvailable} to ${dateLaterAvailable} `;
+                return bookingService.checkBooking(id).then((r) => {
+
+
+                    if (r.length > 0) {
+                        clientMap.set(no, r);
+                        var mess = `You are about to book the car above, it is available now, but it booked on the follow dates:`
+                        for (let index = 0; index < r.length; index++) {
+                            const element = r[index];
+                            let d = new Date(r[index].dateOfBooking);
+                            let fD = new Date(r[index].dateOfReturn);
+                            let dateNoLongerAvailable = d.getDay() + " " + showMonth(d.getMonth()) + " " + d.getFullYear();
+                            let dateLaterAvailable = fD.getDay() + " " + showMonth(fD.getMonth()) + " " + fD.getFullYear();
+                            mess += `\n\nFrom ${dateNoLongerAvailable} to ${dateLaterAvailable} `;
+                        }
+                        mess += `You can book dates outside of those shown  \nSend your name(the name underwhich the booking will be done) \n\nIf this is not what you want type # to restart`
+
+                    } else {
+                        var mess = "You are about to book a vehicle above, please send you full name(or the name under which you want to make the booking)?  ";
                     }
-                    mess += `You can book but only dates outside of those show about  \nIf you still want to book this vehicle , send your name(the name underwhich the booking will be done) \n\nIf this is not what you want type # to restart`
+                    let options = {
+                        unsafeMime: true,
+                    }
+                    return MessageMedia.fromUrl(v.img, options).then((media) => {
 
-                } else {
-                    var mess = "You are about to book a vehicle above, please send you full name(or the name under which you want to make the booking)?  ";
-                }
-                client.sendMessage(msg.from, mess).then((r) => {
-                    // visitor.pageview(`/va/believeeducation`, function (err) {
-                    //     if (err) {
-                    //         console.error(err);
-                    //     }
-                    // Handle the error if necessary.
-                    // In case no error is provided you can be sure
-                    // the request was successfully sent off to Google.
-                    // });
+                        client.sendMessage(msg.from, media, { caption: mess }).then((r) => {
+                            // visitor.pageview(`/va/yarutso`, function (err) {
+                            //     if (err) {
+                            //         console.error(err);
+                            //     }
+                            // Handle the error if necessary.
+                            // In case no error is provided you can be sure
+                            // the request was successfully sent off to Google.
+                            // });
+                        }).catch(console.error);
+                    }).catch(console.error);
+
+
                 }).catch(console.error);
+            });
 
-
-            }).catch(console.error);
-        } if(query === "@seebookings"){
+        } else if (query === "@seebookings") {
 
             mongoWorker.getWorker(no).then((r) => {
 
-                if(r.urlName === "yarutsocarrental"){
+                if (r.urlName === "yarutsocarrental") {
                     messageToSend = ""
                 } else {
                     messageToSend = "You do not have permission to see the bookings"
@@ -1106,39 +1119,21 @@ client.on('message', async msg => {
                             }).catch(console.error);
                         } else {
                             if (messages[0] === "@subscribe") { // @subscribe 
+                                messages.push(query);
+                                messageChain.set(no, messages);
+                                messageToSend = "Please send the Ecocash number you are using to pay, e.g 0771123123 our system works just like the system in the supermarket, after you put in your phone number it will send you a prompt to pay on your phone";
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                    // console.log("Res " + JSON.stringify(res));
+                                    visitor.pageview(`/subscribesendnumber`, function (err) {
+                                        if (err) {
+                                            console.error(err);
+                                        }
+                                        // Handle the error if necessary.
+                                        // In case no error is provided you can be sure
+                                        // the request was successfully sent off to Google.
+                                    });
+                                }).catch((console.error));
 
-                                if (query === "2") { // Custom software package
-                                    messageToSend = "Please send click this link https://wa.me/263772263139?text=Hi+Hive+I+want+a+custom+software+solution+for+my+business";
-
-                                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                                        messageChain.delete(no);
-                                        visitor.pageview(`/customsoftwarepackage`, function (err) {
-                                            if (err) {
-                                                console.error(err);
-                                            }
-                                            // Handle the error if necessary.
-                                            // In case no error is provided you can be sure
-                                            // the request was successfully sent off to Google.
-                                        });
-                                    }).catch((console.error));
-
-
-                                } else { // One of the two packages
-                                    messages.push(query);
-                                    messageChain.set(no, messages);
-                                    messageToSend = "Please send the Ecocash number you are using to pay, e.g 0771123123 our system works just like the system in the supermarket, after you put in your phone number it will send you a prompt to pay on your phone";
-                                    client.sendMessage(msg.from, messageToSend).then((res) => {
-                                        // console.log("Res " + JSON.stringify(res));
-                                        visitor.pageview(`/subscribesendnumber`, function (err) {
-                                            if (err) {
-                                                console.error(err);
-                                            }
-                                            // Handle the error if necessary.
-                                            // In case no error is provided you can be sure
-                                            // the request was successfully sent off to Google.
-                                        });
-                                    }).catch((console.error));
-                                }
                             } else if (messages[0].substring(messages[0].indexOf("@"), messages[0].length).toLowerCase() === "@va" && messages[0].includes("@va")) {
 
                                 let v = clientMap.get(no);
@@ -1820,6 +1815,20 @@ client.on('message', async msg => {
                                     //     // the request was successfully sent off to Google.
                                     // });
                                 }).catch(console.error);
+                            } else if (messages[0] === "@instructions") { //TODO show instructions
+                                if (query === "1") { // Landing Page
+                                    messageToSend = `To update your landing page, click on the link and send,  \n\nTo update your account\n${messageLink(hiveBot, '@update')} \n\nTo Add your services \n${messageLink(hiveBot, '@service')} \n\nTo add your portfolio \n${messageLink(hiveBot, '@portoflio')} \n\nTo add your reviews \n${messageLink(hiveBot, '@rate')} \n\nTo add your display picture \n${messageLink(hiveBot, '@pic')} \n\n${restart}`;
+                                } else if (query === "2") { // Chatbot
+                                    messageToSend = `To configure your Virtual Assistant(Chatbot) click on the link and send \n\nTo access your chatbot\n${messageLink(hiveBot, clientMap.get(no).url + '@va')} \n\nTo add your services with your prices \n${messageLink(hiveBot, '@service')} \n\nTo add your portfolio(work done before)\n${messageLink(hiveBot, '@portfolio')} \n\nTo add frequently asked questions \n${messageLink(hiveBot, '@faq')} \n\nClick and send any of the links above to take advantage of these tools \n\n${restart}`;
+                                } else if (query === "3") { // Book keeping 
+                                    messageToSend = `To use the book keeping and stockmanagement feature click on the link and send \n\nTo add stock \n${messageLink(hiveBot, '@addstock')} \n\nTo see all available stock \n${messageLink(hiveBot, '@stock')} \n\nTo add someone else to see available stock and reports \n${messageLink(hiveBot, '@addstockmember')} \n\nTo confirm when stock item has been sold use the format [item name]@sold[number of items sold] e.g laptop@sold2 means 2 laptop sold OR golf t-shirt@sold10 means 10 of golf t-shirt sold \n\nTo add other means of income apart from sales \n${messageLink(hiveBot, '@income')} \n\nTo add costs \n${messageLink(hiveBot, '@cost')} \n\nTo see financial report \n${messageLink(hiveBot, '@pl')} \n\n${restart}`;
+                                } else if (query === "4") { // Terms and Conditions
+                                    messageToSend = `Here are other keywords you can take advantage of \n\nTo see instructions\n${messageLink(hiveBot, '@instructions')} \n\nTo subscribe \n${messageLink(hiveBot, '@subscribe')} \n\nTo update your account \n${messageLink(hiveBot, '@update')} \n\nTo see Hive Enteprise Solution terms and conditions \n${messageLink(hiveBot, '@terms')} \n\nTo restart any chat send #`;
+                                }
+
+                                client.sendMessage(msg.from, messageToSend).then((res) => {
+                                    // console.log("Res " + JSON.stringify(res));
+                                }).catch(console.error);
                             } else {
                                 messageToSend = "Please choose one of the options above";
 
@@ -2204,36 +2213,24 @@ client.on('message', async msg => {
                             } else if (messages[1] === "2" && messages[0] === "1073unashe") { // Check name and send categories
 
                                 if (query === "1") {
-                                    checkPayment(no).then((v) => {
-                                        if (v.expired) {
-                                            messageToSend = "It appears you are yet to subscribe, please type @subscribe or click this link https://wa.me/263713020524?text=@subscribe";
-                                            visitor.pageview(`/register/accountexpired`, function (err) {
-                                                if (err) {
-                                                    console.error(err);
-                                                }
-                                                // Handle the error if necessary.
-                                                // In case no error is provided you can be sure
-                                                // the request was successfully sent off to Google.
-                                            });
-                                        } else {
-                                            var clientArr = [v.package];
-                                            clientMap.set(no, clientArr);
-                                            messages.push(query);
-                                            messageChain.set(no, messages);
-                                            messageToSend = `Please tell us your the name of your business (this has to be unique, if it was already taken you will be asked again), \n\nIf this is not what you want type # to restart`;
-                                            visitor.pageview(`/register/nameofbusiness`, function (err) {
-                                                if (err) {
-                                                    console.error(err);
-                                                }
-                                                // Handle the error if necessary.
-                                                // In case no error is provided you can be sure
-                                                // the request was successfully sent off to Google.
-                                            });
+
+                                    // clientMap.set(no, clientArr);
+                                    messages.push(query);
+                                    messageChain.set(no, messages);
+                                    messageToSend = `You get 7 day trial period with your new account, so you can get to experience all the features Hive Enteprise Solution has to offer!.Please tell us your the name of your business (this has to be unique, if it was already taken you will be asked again), \n\nIf this is not what you want type # to restart`;
+                                    visitor.pageview(`/register/nameofbusiness`, function (err) {
+                                        if (err) {
+                                            console.error(err);
                                         }
-                                        client.sendMessage(msg.from, messageToSend).then((res) => {
-                                            // console.log("Res " + JSON.stringify(res));
-                                        }).catch((console.error));
+                                        // Handle the error if necessary.
+                                        // In case no error is provided you can be sure
+                                        // the request was successfully sent off to Google.
                                     });
+                                    // }
+                                    client.sendMessage(msg.from, messageToSend).then((res) => {
+                                        // console.log("Res " + JSON.stringify(res));
+                                    }).catch((console.error));
+                                    // });
                                 } else if (query === "2") {
                                     messages.push(query);
                                     messageChain.set(no, messages);
@@ -2245,7 +2242,7 @@ client.on('message', async msg => {
 
                             } else if (messages[1] === "3" && messages[0] === "1073unashe") { // How does it work?
                                 if (query === "1") { // What is hive?
-                                    messageToSend = "Hive is a platform  \n\n*For service providers* \nIt helps them market their services and gives them software tools to improve their services like a chatbot to assist in managing customer services, and managing your business efficiently, and a website to help market your business online example hive website: http://davinsholdings.hive.co.zw/ \n\n*For people searching for a service* \nIt helps people who are searching for services get them conviniently, excellently and reliably, to use Hive you can use our Whatsapp system on this number.\n\nTo learn more about us check out our website on www.hive.co.zw";
+                                    messageToSend = "Hive Enteprise Solution is a platform  \n\n*For service providers* \nIt helps them market their services and gives them software tools to improve their services like a chatbot to assist in managing customer services, and managing your business efficiently, and a website to help market your business online example hive website: http://davinsholdings.hive.co.zw/ \n\n*For people searching for a service* \nIt helps people who are searching for services get them conviniently, excellently and reliably, to use Hive you can use our Whatsapp system on this number.\n\nTo learn more about us check out our website on www.hive.co.zw";
                                     visitor.pageview(`/how/whatishive`, function (err) {
                                         if (err) {
                                             console.error(err);
@@ -2893,6 +2890,10 @@ client.on('message', async msg => {
                                 if (status.data.includes("status=Paid") || status.data.includes("status=Awaiting Delivery") || status.data.includes("status=Delivered")) {
 
                                     let package = 7.99;
+                                    if (messages[1] === "2") {
+                                        package = 84;
+                                    }
+
 
                                     let amount = zwlPrice * package;
 
@@ -3230,7 +3231,7 @@ client.on('message', async msg => {
                             let isAvailableDates = true;
                             if (getDaysDifference(new Date(), finalBookedDate) > -1 || getDaysDifference(new Date(), finalBookedDate) < 366) {
 
-                                if(clientMap.has(no)){
+                                if (clientMap.has(no)) {
                                     for (let i = 0; i < clientMap.get(no).length; i++) {
                                         const element = clientMap.get(no)[i];
                                         if (dayOfYear(element.dateOfBooking) > dayOfYear(messages[2]) && dayOfYear(element.dateOfReturn) < dayOfTheYear(messages[2])
@@ -3240,37 +3241,38 @@ client.on('message', async msg => {
                                             isAvailableDates = false;
                                             return client.sendMessage(no, messageToSend).catch(console.error);
                                         }
-    
+
                                     }
-    
+
                                 }
-                                
+
                                 if (isAvailableDates) {
                                     let id = messages[0].substring(0, messages[0].indexOf('@'));
-                                    bookingService.getItem(id).then((r) => {
-                                        let mess = `${messages[1]} using this phone number ${no.substring(0, no.indexOf('@c.us'))} has just booked a ${r.description} from ${messages[2]} to ${finalBookedDate}`;
+                                    // bookingService.getItem(id).then((r) => {
+                                    let r = rentalItemMap.get(no);
+                                    let mess = `${messages[1]} using this phone number ${no.substring(0, no.indexOf('@c.us'))} has just booked a ${r.description} from ${messages[2]} to ${finalBookedDate}`;
 
-                                        let newBooking = new itemBooked({
-                                            name: messages[1],
-                                            description: r.description,
-                                            itemId: id,
-                                            dateAdded: new Date,
-                                            dateOfReturn: finalBookedDate,
-                                            bookerId: no,
-                                            bookerName: messages[1],
-                                            dateOfBooking: messages[2],
-                                            company: "yarutso car rental"
-                                        });
-                                        client.sendMessage(`263713120606@c.us`, mess).catch(console.error);
-
-                                        bookingService.bookItem(newBooking).then((v) => {
-                                            messageToSend = `Booking was successful`;
-                                            messageChain.delete(no);
-                                            client.sendMessage(no, messageToSend).catch(console.error);
-
-
-                                        }).catch(console.error);
+                                    let newBooking = new itemBooked({
+                                        name: messages[1],
+                                        description: r.description,
+                                        itemId: id,
+                                        dateAdded: new Date,
+                                        dateOfReturn: finalBookedDate,
+                                        bookerId: no,
+                                        bookerName: messages[1],
+                                        dateOfBooking: messages[2],
+                                        company: "yarutso car rental"
                                     });
+                                    client.sendMessage(`263713120606@c.us`, mess).catch(console.error);
+
+                                    bookingService.bookItem(newBooking).then((v) => {
+                                        messageToSend = `Booking was successful`;
+                                        messageChain.delete(no);
+                                        client.sendMessage(no, messageToSend).catch(console.error);
+
+
+                                    }).catch(console.error);
+                                    // });
 
 
                                 }
@@ -4094,7 +4096,7 @@ client.on('message', async msg => {
                                     skills: messages[5],
                                     brief: messages[6],
                                     areas: messages[7],
-                                    package: "7.99",
+                                    package: "0",
                                     expired: false,
                                     no: no,
                                     date: new Date(),
@@ -4272,6 +4274,12 @@ const checkPayment = no => {
         console.error(e);
     }
 }
+
+const messageLink = (number, text) => {
+
+    return `https://wa.me/${number}?text=${text}`;
+}
+
 
 const dayOfYear = date =>
     Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
@@ -4880,6 +4888,251 @@ const checkMessagesWithoutReplies = async () => {
                                 });
                             }).catch(console.error);
                         }
+                    } else if (query.toLowerCase() === "@pl") { //TODO send profit and loss report
+                        messageChain.delete(no);
+                        stockService.getPLReport(no).then((v) => {
+                            if (v.income.length < 1 && v.expense.length < 1) {
+                                messageToSend = `You do not have an information`;
+
+                            } else {
+                                messages.push(query);
+                                messageChain.set(no, messages);
+                                clientMap.set(no, v);
+                                var pl = {};
+
+                                var uniqueID = new Date().getTime().toString();
+                                pl.name = `pl ${uniqueID}`;
+                                pdfMap.set(no, uniqueID);
+
+
+                                let sales = [];
+                                let otherIncome = [];
+                                let salesTotal = 0;
+                                let otherIncomeTotal = 0;
+                                for (let index = 0; index < v.income.length; index++) {
+
+
+                                    if (v.income[index].category === "sales") {
+                                        sales.push({
+                                            description: v.income[index].itemName,
+                                            quantity: v.income[index].numberOfItems,
+                                            price: v.income[index].amount,
+                                            amount: v.income[index].amount,
+                                        });
+                                        salesTotal += (v.income[index].amount * v.income[index].numberOfItems);
+                                    } else if (v.income[index].category === "other") {
+                                        otherIncome.push({
+                                            description: v.income[index].itemName,
+                                            quantity: v.income[index].numberOfItems,
+                                            price: v.income[index].amount,
+                                            amount: v.income[index].amount,
+                                        });
+                                        otherIncomeTotal += (v.income[index].amount * v.income[index].numberOfItems);
+                                    }
+
+
+
+
+
+                                }
+                                pl.sales = sales;
+                                pl.otherIncome = otherIncome;
+                                pl.salesTotal = salesTotal;
+                                pl.otherIncomeTotal = otherIncomeTotal;
+
+
+                                let cogs = 0;
+                                let salaries = 0;
+                                let rentals = 0;
+                                let utilities = 0;
+                                let transport = 0;
+                                let supplies = 0;
+                                let otherExpenses = 0;
+                                for (let index = 0; index < v.expense.length; index++) {
+
+                                    switch (v.expense[index].itemDescription) {
+                                        case "cost of goods sold":
+                                            cogs += v.expense[index].amount;
+                                            break;
+                                        case "salaries":
+                                            salaries += v.expense[index].amount;
+                                            break;
+                                        case "rentals and outgoings":
+                                            rentals += v.expense[index].amount;
+                                            break;
+                                        case "utilities including internet & telephone":
+                                            utilities += v.expense[index].amount;
+                                            break;
+                                        case "transport & logistics":
+                                            transport += v.expense[index].amount;
+                                            break;
+                                        case "office supplies":
+                                            supplies += v.expense[index].amount;
+                                            break;
+                                        case "other":
+                                            otherExpenses += v.expense[index].amount;
+                                            break;
+                                        default:
+                                            otherExpenses += v.expense[index].amount;
+                                            break;
+                                    }
+
+
+                                }
+
+                                pl.cogs = cogs;
+                                pl.salaries = salaries;
+                                pl.rentals = rentals;
+                                pl.utilities = utilities;
+                                pl.transport = transport;
+                                pl.supplies = supplies;
+                                pl.otherExpenses = otherExpenses;
+                                pl.no = no;
+
+                                const plGenerator = new PLGenerator(pl);
+
+                                plGenerator.generate();
+
+                                // Put data on pdf
+                                messageToSend = `Hie there! Your financial report has be generated would you like to see it? \n*1* Yes \n*2* No, delete it`;
+                            }
+                            client.sendMessage(msg.from, messageToSend).then((res) => {
+                                visitor.pageview(`/plinitialize/${v.name}`, function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            }).catch(console.error);
+                        }).catch(console.error);
+                    } else if (query.toLowerCase() === "@cost") {
+                        messageChain.delete(no);
+                        mongoWorker.getWorker(no).then((v) => {
+                            if (typeof v.urlName === "undefined" || v.expired) {
+
+                                if (v.expired) {
+                                    messageToSend = `Your account expired, please renew to continue enjoying the full benefits https://wa.me/${hiveBot}?text=@subscribe`;
+                                } else {
+                                    messageToSend = `Only businesses can add their costs`;
+                                }
+
+                            } else {
+                                messages.push(query);
+                                messageChain.set(no, messages);
+                                messageToSend = `Hie there ${v.name}! , You are about to add an expense, please select the category of cost \n\n*1* Cost of goods sold \n*2* Salaries \n*3* Rentals and outgoings \n*4* Utilities including Internet & telephone \n*5* Transport & Logistics \n*6* Office supplies \n*7* Other \n\nN.B Ensure you send in correct details because you can not edit this later`;
+                            }
+                            client.sendMessage(msg.from, messageToSend).then((res) => {
+                                visitor.pageview(`/addstock/${v.name}`, function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            }).catch(console.error);
+                        }).catch(console.error);
+                    } else if (query.toLowerCase() === "@income") {
+                        messageChain.delete(no);
+                        mongoWorker.getWorker(no).then((v) => {
+                            if (typeof v.urlName === "undefined" || v.expired) {
+
+                                if (v.expired) {
+                                    messageToSend = `Your account expired, please renew to continue enjoying the full benefits https://wa.me/${hiveBot}?text=@subscribe`;
+                                } else {
+                                    messageToSend = `Only businesses can add their income`;
+                                }
+
+                            } else {
+                                messages.push(query);
+                                messageChain.set(no, messages);
+                                messageToSend = `Hie there ${v.name}! , You are about to add another income source, please send the description of this income source, \n\nN.B Ensure you send in correct details because you can not edit this later`;
+                            }
+                            client.sendMessage(msg.from, messageToSend).then((res) => {
+                                visitor.pageview(`/addstock/${v.name}`, function (err) {
+                                    if (err) {
+                                        console.error(err);
+                                    }
+                                    // Handle the error if necessary.
+                                    // In case no error is provided you can be sure
+                                    // the request was successfully sent off to Google.
+                                });
+                            }).catch(console.error);
+                        }).catch(console.error);
+                    } else if (query.substring(query.indexOf('@') + 1, query.length) === "bookyarutso" && query.substring(0, query.indexOf('@')).length === 24) {
+                        messageChain.delete(no);
+                        messages.push(query);
+                        messageChain.set(no, messages);
+                        var id = query.substring(0, query.indexOf('@'));
+                        bookingService.getItem(id).then((v) => {
+                            rentalItemMap.set(no, v);
+
+                            return bookingService.checkBooking(id).then((r) => {
+
+
+                                if (r.length > 0) {
+                                    clientMap.set(no, r);
+                                    var mess = `You are about to book the car above, it is available now, but it booked on the follow dates:`
+                                    for (let index = 0; index < r.length; index++) {
+                                        const element = r[index];
+                                        let d = new Date(r[index].dateOfBooking);
+                                        let fD = new Date(r[index].dateOfReturn);
+                                        let dateNoLongerAvailable = d.getDay() + " " + showMonth(d.getMonth()) + " " + d.getFullYear();
+                                        let dateLaterAvailable = fD.getDay() + " " + showMonth(fD.getMonth()) + " " + fD.getFullYear();
+                                        mess += `\n\nFrom ${dateNoLongerAvailable} to ${dateLaterAvailable} `;
+                                    }
+                                    mess += `You can book dates outside of those shown  \nSend your name(the name underwhich the booking will be done) \n\nIf this is not what you want type # to restart`
+
+                                } else {
+                                    var mess = "You are about to book a vehicle above, please send you full name(or the name under which you want to make the booking)?  ";
+                                }
+                                let options = {
+                                    unsafeMime: true,
+                                }
+                                return MessageMedia.fromUrl(v.img, options).then((media) => {
+
+                                    client.sendMessage(msg.from, media, { caption: mess }).then((r) => {
+                                        // visitor.pageview(`/va/yarutso`, function (err) {
+                                        //     if (err) {
+                                        //         console.error(err);
+                                        //     }
+                                        // Handle the error if necessary.
+                                        // In case no error is provided you can be sure
+                                        // the request was successfully sent off to Google.
+                                        // });
+                                    }).catch(console.error);
+                                }).catch(console.error);
+
+
+                            }).catch(console.error);
+                        });
+
+                    } else if (query === "@seebookings") {
+
+                        mongoWorker.getWorker(no).then((r) => {
+
+                            if (r.urlName === "yarutsocarrental") {
+                                messageToSend = ""
+                            } else {
+                                messageToSend = "You do not have permission to see the bookings"
+                            }
+
+                            client.sendMessage(msg.from, mess).then((r) => {
+                                // visitor.pageview(`/va/believeeducation`, function (err) {
+                                //     if (err) {
+                                //         console.error(err);
+                                //     }
+                                // Handle the error if necessary.
+                                // In case no error is provided you can be sure
+                                // the request was successfully sent off to Google.
+                                // });
+                            }).catch(console.error);
+
+                        }).catch(console.error);
+
+
                     } else {
 
                         // user has not communicated yet, welcome them

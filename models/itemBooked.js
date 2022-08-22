@@ -11,6 +11,7 @@ var ItemBookedSchema = new Schema({
     bookerName: { type: String },
     dateOfBooking: { type: Date },
     company: { type: String },
+    img: { type: String },
 });
 
 
