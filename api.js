@@ -299,8 +299,10 @@ client.on('message', async msg => {
             if (query.toLocaleLowerCase() === "@profile") {
                 mongoWorker.getWorker(no).then((v) => {
 
-                    if (typeof v.urlName === "undefined") {
-                        messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas}`;
+
+
+                    if (typeof v.pic === "undefined") {
+                        messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} \nTo chat to their Chatbot(Virtual Assistant) click \nhttps://wa.me/263713020524?text=${v.urlName}@va   \n_Website_: ${v.url}`;
                         client.sendMessage(msg.from, messageToSend).then((v) => {
                             visitor.pageview(`/profile/${v.name}`, function (err) {
                                 if (err) {
@@ -312,18 +314,16 @@ client.on('message', async msg => {
                             });
                         }).catch(console.error);
                     } else {
-                        let website = "";
-                        if (v.package === "7.99") {
-                            website = `_Website_: ${v.url}`;
-                        }
+
                         let options = {
                             unsafeMime: true,
                         }
 
-                        if (typeof v.pic === "undefined") {
-                            messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} \nTo chat to their Chatbot(Virtual Assistant) click \nhttps://wa.me/263713020524?text=${v.urlName}@va   \n${website}`;
-                            client.sendMessage(msg.from, messageToSend).then((v) => {
-                                visitor.pageview(`/profile/${v.name}`, function (err) {
+
+                        return MessageMedia.fromUrl(v.pic, options).then((media) => {
+                            messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} \nTo chat to their Chatbot(Virtual Assistant) click \nhttps://wa.me/263713020524?text=${v.urlName}@va   \n_Website_: ${v.url}`;
+                            client.sendMessage(msg.from, media, { caption: messageToSend }).then((v) => {
+                                visitor.pageview(`/profile/media/${v.name}`, function (err) {
                                     if (err) {
                                         console.error(err);
                                     }
@@ -332,33 +332,28 @@ client.on('message', async msg => {
                                     // the request was successfully sent off to Google.
                                 });
                             }).catch(console.error);
-                        } else {
-                            return MessageMedia.fromUrl(v.pic, options).then((media) => {
-                                messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} \nTo chat to their Chatbot(Virtual Assistant) click \nhttps://wa.me/263713020524?text=${v.urlName}@va   \n${website}`;
-                                client.sendMessage(msg.from, media, { caption: messageToSend }).then((v) => {
-                                    visitor.pageview(`/profile/media/${v.name}`, function (err) {
-                                        if (err) {
-                                            console.error(err);
-                                        }
-                                        // Handle the error if necessary.
-                                        // In case no error is provided you can be sure
-                                        // the request was successfully sent off to Google.
-                                    });
-                                }).catch(console.error);
-                            }).catch(console.error);
-                        }
+                        }).catch(console.error);
                     }
+
 
                 }).catch(console.error);
             } else {
                 var id = query.substring(0, query.indexOf('@'));
                 mongoWorker.getWorkerById(id).then((v) => {
 
+
+
+                    let mess = `Number ending ${no.substring(no.indexOf("@c.us") - 3, no.indexOf("@c.us"))} just viewed your profile`;
+                    client.sendMessage(v.no, mess).catch(console.error);
+                    let chatBotWebsite = `\nTo chat to their Chatbot(Virtual Assistant) click \nhttps://wa.me/263713020524?text=${v.urlName}@va   \n_Website_: ${v.url}`;
                     if (typeof v.urlName === "undefined") {
-                        mongoWorker.removeBids(v.bids, v.no).catch(console.error);
-                        messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} \n_Contact_: https://wa.me/${v.no.substring(0, v.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Hive+I+am+interested+in+your+services`;
+                        chatBotWebsite = ``;
+                    }
+
+                    if (typeof v.pic === "undefined") {
+                        messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} ${chatBotWebsite} \n_Contact_: https://wa.me/${v.no.substring(0, v.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Hive+I+am+interested+in+your+services`;
                         client.sendMessage(msg.from, messageToSend).catch(console.error);
-                        visitor.pageview(`/profile/freelancer/${v.name}`, function (err) {
+                        visitor.pageview(`/profile/business/nopic/${v.name}`, function (err) {
                             if (err) {
                                 console.error(err);
                             }
@@ -366,50 +361,29 @@ client.on('message', async msg => {
                             // In case no error is provided you can be sure
                             // the request was successfully sent off to Google.
                         });
-                        let mess = `Number ending ${no.substring(no.indexOf("@c.us") - 3, no.indexOf("@c.us"))} just viewed your profile`;
-                        client.sendMessage(v.no, mess).catch(console.error);
 
                     } else {
-                        let website = "";
-                        if (v.package === "7.99") {
-                            website = `_Website_: ${v.url}`;
-                        }
+                        visitor.pageview(`/profile/business/${v.name}`, function (err) {
+                            if (err) {
+                                console.error(err);
+                            }
+                            // Handle the error if necessary.
+                            // In case no error is provided you can be sure
+                            // the request was successfully sent off to Google.
+                        });
+
                         let options = {
                             unsafeMime: true,
                         }
 
-                        if (typeof v.pic === "undefined") {
-                            messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} \nTo chat to their Chatbot(Virtual Assistant) click \nhttps://wa.me/263713020524?text=${v.urlName}@va   \n${website} \n_Contact_: https://wa.me/${v.no.substring(0, v.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Hive+I+am+interested+in+your+services`;
-                            client.sendMessage(msg.from, messageToSend).catch(console.error);
-                            visitor.pageview(`/profile/business/nopic/${v.name}`, function (err) {
-                                if (err) {
-                                    console.error(err);
-                                }
-                                // Handle the error if necessary.
-                                // In case no error is provided you can be sure
-                                // the request was successfully sent off to Google.
-                            });
-                            let mess = `Number ending ${no.substring(no.indexOf("@c.us") - 3, no.indexOf("@c.us"))} just viewed your profile`;
-                            client.sendMessage(v.no, mess).catch(console.error);
-                        } else {
 
-                            let mess = `Number ending ${no.substring(no.indexOf("@c.us") - 3, no.indexOf("@c.us"))} just viewed your profile`;
-                            client.sendMessage(v.no, mess).catch(console.error);
-                            visitor.pageview(`/profile/business/${v.name}`, function (err) {
-                                if (err) {
-                                    console.error(err);
-                                }
-                                // Handle the error if necessary.
-                                // In case no error is provided you can be sure
-                                // the request was successfully sent off to Google.
-                            });
-                            return MessageMedia.fromUrl(v.pic, options).then((media) => {
-                                messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} \nTo chat to their Chatbot(Virtual Assistant) click \nhttps://wa.me/263713020524?text=${v.urlName}@va   \n${website} \n_Contact_: https://wa.me/${v.no.substring(0, v.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Hive+I+am+interested+in+your+services`;
-                                client.sendMessage(msg.from, media, { caption: messageToSend }).catch(console.error);
+                        return MessageMedia.fromUrl(v.pic, options).then((media) => {
+                            messageToSend = `_Name_: ${v.name} \n_Brief Intro_:${v.brief} \n_Services_: ${v.skills} \n_Areas able to serve_: ${v.areas} ${chatBotWebsite} \n_Contact_: https://wa.me/${v.no.substring(0, v.no.indexOf("@c.us"))}?text=Hi+I+got+your+number+from+Hive+I+am+interested+in+your+services`;
+                            client.sendMessage(msg.from, media, { caption: messageToSend }).catch(console.error);
 
-                            }).catch(console.error);
-                        }
+                        }).catch(console.error);
                     }
+
 
 
 
@@ -639,14 +613,14 @@ client.on('message', async msg => {
         } else if (query.toLowerCase() === "@instructions") {
             messageChain.delete(no);
             mongoWorker.getWorker(no).then((v) => {
-                if (typeof v.urlName !== "undefined" && typeof v.url !== "undefined") {
-                    messages.push(query);
-                    clientMap.set(no, v);
-                    messageChain.set(no, messages);
-                    messageToSend = `Hie ${v.name} , here are the options you have as a business account holder, Please select the options you want to see \n\n*1* Hive Landing Page instructions \n*2* Virtual Assistant(Chatbot)  \n*3* Book keeping and stock management \n*4* Other`;
-                } else {
-                    messageToSend = `Hie ${v.name} , here are some important keywords you can take advantage of \n\nTo update your profile \n${messageLink(hiveBot, '@update')} \n\nTo see your profile \n${messageLink(hiveBot, '@profile')}  \n\nTo see Hive Terms and Conditions \n${messageLink(hiveBot, '@terms')}`;
+                messages.push(query);
+                clientMap.set(no, v);
+                messageChain.set(no, messages);
+                let accountType = `freelance account`;
+                if (typeof v.package === "7.99" && typeof v.package !== "undefined") {
+                    accountType = `business account`;
                 }
+                messageToSend = `Hie ${v.name} , here are the options you have as a ${accountType} holder, Please select the options you want to see \n\n*1* Hive Landing Page instructions \n*2* Virtual Assistant(Chatbot)  \n*3* Book keeping and stock management \n*4* Other`;
                 client.sendMessage(msg.from, messageToSend).then((res) => {
                     visitor.pageview(`/instructions/${v.name}`, function (err) {
                         if (err) {
@@ -1455,7 +1429,7 @@ client.on('message', async msg => {
                             } else if (query === "3" && messages[0] === "1073unashe") { // How does this work option?
                                 messages.push(query);
                                 messageChain.set(no, messages);
-                                messageToSend = "Please select the option you would like \n\n \n*1* What is Hive? \n*2* Frequently Asked Questions \n*3* Terms and Conditions  \n\nTo choose any option send a number eg. 2 to get see Frequently asked questions";
+                                messageToSend = `Please select the option you would like \n\n \n*1* What is Hive? \n*2* Frequently Asked Questions \n*3* Terms and Conditions  \n\nTo choose any option send a number eg. 2 to get see Frequently asked questions ${restart}`;
 
                                 client.sendMessage(msg.from, messageToSend).then((res) => {
                                     // console.log("Res " + JSON.stringify(res));
@@ -1819,7 +1793,7 @@ client.on('message', async msg => {
                                 if (query === "1") { // Landing Page
                                     messageToSend = `To update your landing page, click on the link and send,  \n\nTo update your account\n${messageLink(hiveBot, '@update')} \n\nTo Add your services \n${messageLink(hiveBot, '@service')} \n\nTo add your portfolio \n${messageLink(hiveBot, '@portoflio')} \n\nTo add your reviews \n${messageLink(hiveBot, '@rate')} \n\nTo add your display picture \n${messageLink(hiveBot, '@pic')} \n\n${restart}`;
                                 } else if (query === "2") { // Chatbot
-                                    messageToSend = `To configure your Virtual Assistant(Chatbot) click on the link and send \n\nTo access your chatbot\n${messageLink(hiveBot, clientMap.get(no).url + '@va')} \n\nTo add your services with your prices \n${messageLink(hiveBot, '@service')} \n\nTo add your portfolio(work done before)\n${messageLink(hiveBot, '@portfolio')} \n\nTo add frequently asked questions \n${messageLink(hiveBot, '@faq')} \n\nClick and send any of the links above to take advantage of these tools \n\n${restart}`;
+                                    messageToSend = `To configure your Virtual Assistant(Chatbot) click on the link and send \n\nTo access your chatbot\n${messageLink(hiveBot, clientMap.get(no).urlName + '@va')} \n\nTo add your services with your prices \n${messageLink(hiveBot, '@service')} \n\nTo add your portfolio(work done before)\n${messageLink(hiveBot, '@portfolio')} \n\nTo add frequently asked questions \n${messageLink(hiveBot, '@faq')} \n\nClick and send any of the links above to take advantage of these tools \n\n${restart}`;
                                 } else if (query === "3") { // Book keeping 
                                     messageToSend = `To use the book keeping and stockmanagement feature click on the link and send \n\nTo add stock \n${messageLink(hiveBot, '@addstock')} \n\nTo see all available stock \n${messageLink(hiveBot, '@stock')} \n\nTo add someone else to see available stock and reports \n${messageLink(hiveBot, '@addstockmember')} \n\nTo confirm when stock item has been sold use the format [item name]@sold[number of items sold] e.g laptop@sold2 means 2 laptop sold OR golf t-shirt@sold10 means 10 of golf t-shirt sold \n\nTo add other means of income apart from sales \n${messageLink(hiveBot, '@income')} \n\nTo add costs \n${messageLink(hiveBot, '@cost')} \n\nTo see financial report \n${messageLink(hiveBot, '@pl')} \n\n${restart}`;
                                 } else if (query === "4") { // Terms and Conditions
@@ -2217,7 +2191,7 @@ client.on('message', async msg => {
                                     // clientMap.set(no, clientArr);
                                     messages.push(query);
                                     messageChain.set(no, messages);
-                                    messageToSend = `You get 7 day trial period with your new account, so you can get to experience all the features Hive Enteprise Solution has to offer!.Please tell us your the name of your business (this has to be unique, if it was already taken you will be asked again), \n\nIf this is not what you want type # to restart`;
+                                    messageToSend = `Please tell us your the name of your business (this has to be unique, if it was already taken you will be asked again), \n\nIf this is not what you want type # to restart`;
                                     visitor.pageview(`/register/nameofbusiness`, function (err) {
                                         if (err) {
                                             console.error(err);
@@ -2242,7 +2216,7 @@ client.on('message', async msg => {
 
                             } else if (messages[1] === "3" && messages[0] === "1073unashe") { // How does it work?
                                 if (query === "1") { // What is hive?
-                                    messageToSend = "Hive Enteprise Solution is a platform  \n\n*For service providers* \nIt helps them market their services and gives them software tools to improve their services like a chatbot to assist in managing customer services, and managing your business efficiently, and a website to help market your business online example hive website: http://davinsholdings.hive.co.zw/ \n\n*For people searching for a service* \nIt helps people who are searching for services get them conviniently, excellently and reliably, to use Hive you can use our Whatsapp system on this number.\n\nTo learn more about us check out our website on www.hive.co.zw";
+                                    messageToSend = `Hive Enteprise Solution is a platform  \n\n*For service providers* \nIt helps them market their services and gives them software tools to improve their services like a chatbot to assist in managing customer services, and managing your business efficiently, and a website to help market your business online example hive website: http://davinsholdings.hive.co.zw/  and book keeping software ALL FOR FREE \n\n*For people searching for a service* \nIt helps people who are searching for services get them conviniently, excellently and reliably, to use Hive you can use our Whatsapp system on this number.\n\nTo learn more about us check out our website on www.hive.co.zw \n\n${restart}`;
                                     visitor.pageview(`/how/whatishive`, function (err) {
                                         if (err) {
                                             console.error(err);
@@ -2262,7 +2236,7 @@ client.on('message', async msg => {
                                     });
                                     messages.push(query);
                                     messageChain.set(no, messages);
-                                    messageToSend = "Please send the number of the option you want \n\n*1* I am looking for a service what do I do? \n*2* I am a freelancer what should I do?  \n*3* I have a business what should I do? \n*4* What is a Virtual Assistant?  \n*5* What is a Landing Page? \n*6* How do I access the landing page?  \n\nFor any other questions you can contact our support number by clicking this link https://wa.me/263719940513?text=Hi+Hive+I+have+a+question";
+                                    messageToSend = `Please send the number of the option you want \n\n*1* I am looking for a service what do I do? \n*2* I am a freelancer what should I do?  \n*3* I have a business what should I do? \n*4* What is a Virtual Assistant?  \n*5* What is a Landing Page? \n*6* How do I access the landing page?  \n\nFor any other questions you can contact our support number by clicking this link https://wa.me/263719940513?text=Hi+Hive+I+have+a+question \n\n${restart}`;
                                 } else if (query === "3") { // Terms and conditions
                                     messageToSend = "Sending Terms and Conditions Pdf document";
                                     var mediaMessage = "Hive Terms and Conditions";
@@ -2804,7 +2778,7 @@ client.on('message', async msg => {
                         } else if (messages[1] === "3" && messages[0] === "1073unashe") { // How does this work
                             if (messages[2] === "2") { // FAQs
                                 if (query === "1") {
-                                    messageToSend = "You can find a service on this whatsapp system, the option to find service providers in option 1 on the welcome page, to search from this point type # to restart, then type hi, and after the welcome message, then send 1 and after the question type the service or service provider you are looking for, \n\nIT IS FREE TO USE";
+                                    messageToSend = `You can find a service on this whatsapp system, the option to find service providers in option 1 on the welcome page, to search from this point type # to restart, then type hi, and after the welcome message, then send 1 and after the question type the service or service provider you are looking for, \n\nIT IS FREE TO USE \n\n${restart}`;
                                     visitor.pageview(`/faqs/howtosearch`, function (err) {
                                         if (err) {
                                             console.error(err);
@@ -2814,7 +2788,7 @@ client.on('message', async msg => {
                                         // the request was successfully sent off to Google.
                                     });
                                 } else if (query === "2") {
-                                    messageToSend = "Hive will help you get clients, and begin making money registration is FREE, you only pay after you get leads, and you will see the leads as they come, to create your FREE profile, type # and send, then click the link, after the welcome message send option 2, then send option 2 and answer the few questions that follow";
+                                    messageToSend = `Hive will help you get clients, and begin making money registration is FREE, you only pay after you get leads, and you will see the leads as they come, to create your FREE profile, type # and send, then click the link, after the welcome message send option 2, then send option 2 and answer the few questions that follow \n\n${restart}`;
                                     visitor.pageview(`/faqs/freelancer`, function (err) {
                                         if (err) {
                                             console.error(err);
@@ -2824,7 +2798,7 @@ client.on('message', async msg => {
                                         // the request was successfully sent off to Google.
                                     });
                                 } else if (query === "3") {
-                                    messageToSend = "Hive Enteprise Solution will help you lower the costs of your business with access to tools like stock management, and help you reach more people with tools like a landing page, while also helping you attending to clients with tools like a chatbot , all these normally amount to over ~2000USD~ but you can get it for only 7.99USD p.m no contract, meaning you can cancel at anytime ";
+                                    messageToSend = `Hive Enteprise Solution will help you lower the costs of your business with access to tools like stock management, book keeping, and help you reach more people with tools like a landing page, while also helping you attending to clients with tools like a chatbot , all these normally amount to over ~200USD~ outside of monthly fees but you can get it for FREE only on Hive Enteprise Solution\n\n${restart}`;
                                     visitor.pageview(`/faqs/iamabusiness`, function (err) {
                                         if (err) {
                                             console.error(err);
@@ -2834,7 +2808,7 @@ client.on('message', async msg => {
                                         // the request was successfully sent off to Google.
                                     });
                                 } else if (query === "4") {
-                                    messageToSend = "A virtual assistant is a Whatsapp with automated(Computer generated) responses sometimes refered to as Whatsapp Bot, Hive is an example of such, when you create a profile you get to create one for your services, so clients can see your prices, see Frequently asked questions, and even get a quotation in pdf format, with a virtual assistant you can concentrate on your work, while it works for you";
+                                    messageToSend = "A virtual assistant is a Whatsapp with automated(Computer generated) responses sometimes refered to as Whatsapp Chatbot, Hive is an example of such, when you create a profile you get to create one for your services, so clients can see your prices, see Frequently asked questions, and even get a quotation in pdf format, with a virtual assistant you can concentrate on your work, while it works for you";
                                     visitor.pageview(`/faqs/whatisavirtualassistant`, function (err) {
                                         if (err) {
                                             console.error(err);
@@ -2844,7 +2818,7 @@ client.on('message', async msg => {
                                         // the request was successfully sent off to Google.
                                     });
                                 } else if (query === "5") {
-                                    messageToSend = "Hive landing page is a online site for your services only available for businesses, it would be found on [yourname].hive.co.zw example business already using our service http://davinsholdings.hive.co.zw/, and is really a website without the extra costs of a domain and hosting, and new ways of showing your website will be added weekly, it helps you increase your market reach, and attract more clients to your business";
+                                    messageToSend = "Hive landing page is a online site for your services or products, it would be found on [yourname].hive.co.zw example business already using our service http://davinsholdings.hive.co.zw/, and is really a website without the extra costs of a domain and hosting, and new ways of showing your website will be added weekly, it helps you increase your market reach, and attract more clients to your business";
                                     visitor.pageview(`/faqs/whatisalandingpage`, function (err) {
                                         if (err) {
                                             console.error(err);
@@ -2854,7 +2828,7 @@ client.on('message', async msg => {
                                         // the request was successfully sent off to Google.
                                     });
                                 } else if (query === "6") {
-                                    messageToSend = "You can access your landing page via the link [yourname].hive.co.zw only available for businesses, you can even use it in your marketing campaigns as it will help you leave a greater impression on the client check this example unashe.hive.co.zw";
+                                    messageToSend = "You can access your landing page via the link [yourname].hive.co.zw , you can even use it in your marketing campaigns as it will help you leave a greater impression on the client check this example unashe.hive.co.zw";
                                     visitor.pageview(`/faqs/howdoiaccessmylandingpage`, function (err) {
                                         if (err) {
                                             console.error(err);
@@ -4088,22 +4062,9 @@ client.on('message', async msg => {
                                     break;
                             }
 
-
+                            let package = "0";
                             if (messages[2] === "1") {
-                                var worker = new workerModel({
-                                    name: messages[3].toLowerCase(),
-                                    category: category,
-                                    skills: messages[5],
-                                    brief: messages[6],
-                                    areas: messages[7],
-                                    package: "0",
-                                    expired: false,
-                                    no: no,
-                                    date: new Date(),
-                                    id: milliSecondsSinceEpoch,
-                                    urlName: messages[3].toLowerCase().replace(/\s/g, ''),
-                                    url: `http://${messages[3].toLowerCase().replace(/\s/g, '')}.hive.co.zw`
-                                });
+                                package = "7.99";
                                 visitor.pageview(`/registration/business`, function (err) {
                                     if (err) {
                                         console.error(err);
@@ -4113,20 +4074,6 @@ client.on('message', async msg => {
                                     // the request was successfully sent off to Google.
                                 });
                             } else if (messages[2] === "2") {
-                                messageChain.delete(no);
-                                var worker = new workerModel({
-                                    name: messages[3].toLowerCase(),
-                                    category: category,
-                                    skills: messages[5],
-                                    brief: messages[6],
-                                    areas: messages[7],
-                                    bids: 20,
-                                    package: "0",
-                                    expired: false,
-                                    no: no,
-                                    date: new Date(),
-                                    id: milliSecondsSinceEpoch,
-                                });
                                 visitor.pageview(`/registration/freelancer`, function (err) {
                                     if (err) {
                                         console.error(err);
@@ -4136,10 +4083,24 @@ client.on('message', async msg => {
                                     // the request was successfully sent off to Google.
                                 });
                             }
-
+                            var worker = new workerModel({
+                                name: messages[3].toLowerCase(),
+                                category: category,
+                                skills: messages[5],
+                                brief: messages[6],
+                                areas: messages[7],
+                                package: package,
+                                expired: false,
+                                no: no,
+                                date: new Date(),
+                                id: milliSecondsSinceEpoch,
+                                urlName: messages[3].toLowerCase().replace(/\s/g, ''),
+                                url: `http://${messages[3].toLowerCase().replace(/\s/g, '')}.hive.co.zw`
+                            });
                             mongoWorker.saveWorker(worker).then((v) => {
 
                                 if (!v.expired) {
+                                    messageChain.delete(no);
                                     messageToSend = `Thank you for your patience, Your account has been added to see all the available features for you send the keyword @instructions, or click the link https://wa.me/${hiveBot}?text=@instructions`;
 
                                 } else {
